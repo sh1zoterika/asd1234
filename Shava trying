@@ -1,0 +1,252 @@
+import sys
+import sqlite3
+import docx
+import openpyxl
+import os
+
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QVBoxLayout, QWidget, QTableWidget, QTableWidgetItem, QMessageBox, QFileDialog, QComboBox, QDialog, QHBoxLayout, QHeaderView
+from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt
+
+class WarehouseManager(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Менеджер заказов и складов")
+        self.setGeometry(700, 300, 500, 400)
+
+        # Установливаю иконки
+        self.setWindowIcon(QIcon('warehouse_icon.ico'))
+
+        # Подключение к базе данных 
+        self.conn = sqlite3.connect('warehouses.db')
+        self.cursor = self.conn.cursor()
+        self.create_tables()
+
+        # Создание интерфейса
+        self.create_ul()
+
+    def create_tables(self):
+        # Создание таблиц базы данных
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS Products (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                            name VARCHAR(15) NOT NULL,
+                            article VARCHAR(15) NOT NULL,
+                            lifetime INT NOT NULL,
+                            description TEXT NOT NULL, 
+                            category VARCHAR(20) NOT NULL, 
+                            png_url BLOB)''')
+        
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS Warehouses (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name VARCHAR(10) NOT NULL,
+                            adress VARCHAR(50) NOT NULL, 
+                            geo_text TEXT NOT NULL,
+                            geo_coordinates INT NOT NULL)''')
+        
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS ProductInWarehouse (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            warehouse_id INTEGER NOT NULL,
+                            product_id INTEGER NOT NULL,
+                            amount INT NOT NULL,
+                            FOREIGN KEY(warehouse_id) REFERENCES Warehouses(id),
+                            FOREIGN KEY(product_id) REFERENCES Products(id))''')
+
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS Clients (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            name VARCHAR(25) NOT NULL,
+                            orders TEXT NOT NULL, 
+                            info TEXT NOT NULL,
+                            phonenumber VARCHAR(9) NOT NULL,
+                            adress VARCHAR(50) NOT NULL)''') 
+        
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS Orders (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            client_id INTEGER NOT NULL,
+                            price INT NOT NULL,
+                            date INT NOT NULL,
+                            status VARCHAR(20) NOT NULL,
+                            FOREIGN KEY(client_id) REFERENCES Clients(id))''')
+        
+        self.cursor.execute('''CREATE TABLE IF NOT EXISTS Order_items (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            order_id INTEGER NOT NULL,
+                            product_id INTEGER NOT NULL,
+                            amount INT NOT NULL,
+                            price INT NOT NULL, 
+                            FOREIGN KEY(order_id) REFERENCES Orders(id),
+                            FOREIGN KEY(product_id) REFERENCES Products(id))''')
+        
+        self.conn.commit()
+
+    def create_ul(self):
+        layout = QVBoxLayout()
+
+        # Создаю кнопки для операций 
+        btn_sale = QPushButton('Продажа товара', self)
+        btn_sale.clicked.connect(self.sale)
+        layout.addWidget(btn_sale)
+
+        btn_reception = QPushButton('Приёмка товара', self)
+        btn_reception.clicked.connect(self.reception)
+        layout.addWidget(btn_reception)
+
+        btn_transfer = QPushButton('Перемещение товара', self)
+        btn_transfer.clicked.connect(self.transfer)
+        layout.addWidget(btn_transfer)
+
+        btn_writeoff = QPushButton('Списание товара', self)
+        btn_writeoff.clicked.connect(self.writeoff)
+        layout.addWidget(btn_writeoff)
+
+        btn_clients = QPushButton('Клиенты', self)
+        btn_clients.clicked.connect(self.show_clients)
+        layout.addWidget(btn_clients)
+
+        btn_warehouses = QPushButton('Склады', self)
+        btn_warehouses.clicked.connect(self.show_warehouses)
+        layout.addWidget(btn_warehouses)
+
+        btn_documents = QPushButton('Документы', self)
+        btn_documents.clicked.connect(self.create_document)
+        layout.addWidget(btn_documents)
+
+        btn_template = QPushButton('Шаблоны', self)
+        btn_template.clicked.connect(self.create_template)
+        layout.addWidget(btn_template)
+
+        # Основное окно 
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+    def sale(self):
+        # Логика для обработки продажи
+        sale_window = SaleWindow(self)
+        sale_window.exec_()
+        # QMessageBox.information(self, 'Продажа', 'Продажа товаров')
+
+    def reception(self):
+        # Логика для обработки приёмки 
+        QMessageBox.information(self, 'Приёмка', 'Приёмка товаров')
+
+    def transfer(self):
+        # Логика для обработки перемещения 
+        QMessageBox.information(self, 'Перемещение', 'Перемещение товаров')
+    
+    def writeoff(self):
+        # Логика для обработки списания 
+        QMessageBox.information(self, 'Списание', 'Списание товаров')
+
+    def show_clients(self):
+        # Логика для отображения клиентов  
+        QMessageBox.information(self, 'Клиенты', 'Список клиентов')
+
+    def show_warehouses(self):
+        # Логика для отображения складов  
+        QMessageBox.information(self, 'Склады', 'Список складов')
+
+    def create_document(self):
+        # Создание документа Word или Excel
+        doc_type, _ = QFileDialog.getSaveFileName(self, 'Создать документ', '', 'Документы (*.docx *.xlsx)')
+        if doc_type.endswith('.docx'):
+            doc = docx.Document()
+            doc.add_heading('Документ', 0)
+            doc.save(doc_type)
+        elif doc_type.endswith('.xlsx'):
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = 'Лист1'
+            wb.save(doc_type)
+        os.startfile(doc_type)
+
+    def create_template(self):
+        # Логика для создания шаблонов 
+        QMessageBox.information(self, 'Шаблон', 'Создание шаблона')
+
+class SaleWindow(QDialog):
+    def __init__(self, parent=None):
+        super(SaleWindow, self).__init__(parent)
+        self.setWindowTitle('Продажа товаров')
+        self.setGeometry(800, 400, 400, 300)
+
+        layout = QVBoxLayout()
+
+        # Создаю выпадающий список для выбора заказа
+        self.combo_box = QComboBox(self)
+        self.combo_box.addItems(self.get_orders())
+        layout.addWidget(self.combo_box)
+
+        # Кнопка для открытия окна текущих заказов
+        self.current_orders_btn = QPushButton('Текущие заказы', self)
+        self.current_orders_btn.clicked.connect(self.show_current_orders)
+        layout.addWidget(self.current_orders_btn)
+
+        # Кнопка для добавления товара в заказ
+        self.add_product_btn = QPushButton('Добавить товары', self)
+        layout.addWidget(self.add_product_btn)
+
+        # Таблица для отображения товаров в заказе
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(['id', 'warehouse_id', 'product_id', 'amount'])
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.table)
+
+        # Кнопка управления 
+        self.remove_product_btn = QPushButton('Удалить товары из заказа', self)
+        self.confirm_btn = QPushButton('Подтвердить', self)
+        layout.addWidget(self.remove_product_btn)
+        layout.addWidget(self.confirm_btn)
+
+        self.setLayout(layout)
+
+    def get_orders(self):
+        # Возвращаю тестовые данные для проверки
+        return ["Order 1", "Order 2", "Order 3"]
+
+    def show_current_orders(self):
+        # Открываю окно с текущими заказами 
+        current_order_window = CurrentOrderWindow(self)
+        current_order_window.exec_()
+
+class CurrentOrderWindow(QDialog):
+    def __init__(self, parent=None):
+        super(CurrentOrderWindow, self).__init__(parent)
+        self.setWindowTitle('Текущие заказы')
+        self.setGeometry(850, 450, 500, 400)
+
+        layout = QVBoxLayout()
+
+        # Таблица для отображения текущих заказов
+        self.orders_table = QTableWidget(self)
+        self.orders_table.setColumnCount(5)
+        self.orders_table.setHorizontalHeaderLabels(['id', 'client_id', 'price', 'date', 'status'])
+        self.orders_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        layout.addWidget(self.orders_table)
+
+        # Кнопки управления заказами
+        buttons_layout = QHBoxLayout()
+
+        self.add_order_btn = QPushButton('Добавить заказ', self)
+        buttons_layout.addWidget(self.add_order_btn)
+
+        self.remove_order_btn = QPushButton('Удалить заказ', self)
+        buttons_layout.addWidget(self.remove_order_btn)
+
+        self.cancel_btn = QPushButton('Отменить изменения', self)
+        buttons_layout.addWidget(self.cancel_btn)
+
+        self.save_btn = QPushButton('Сохранить изменения', self)
+        buttons_layout.addWidget(self.save_btn)
+
+        layout.addLayout(buttons_layout)
+        self.setLayout(layout)
+
+if __name__ == '__main__':
+    try:
+        app = QApplication(sys.argv)
+        window = WarehouseManager()
+        window.show()
+        sys.exit(app.exec_())
+    except Exception as e:
+        print(f"Error: {e}")
