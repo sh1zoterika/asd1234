@@ -257,6 +257,101 @@ class BaseWindow(QMainWindow):
     def closeEvent(self, event):
         super().closeEvent(event)
 
+class BaseProductWindow(QMainWindow):
+    def __init__(self, title, geometry, headers, query, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setGeometry(*geometry)
+
+        self.query = query
+        self.headers = headers
+
+        self.db = Database()  # Инициализация атрибута db
+
+        layout = QVBoxLayout()
+
+        # ComboBox for selecting warehouse
+        self.combo_box = QComboBox()
+        self.load_warehouses()
+        self.combo_box.currentIndexChanged.connect(self.update_warehouse_table)
+        layout.addWidget(self.combo_box)
+
+        # Horizontal layout for the two tables
+        tables_layout = QHBoxLayout()
+
+        # Table for displaying products from the selected warehouse
+        self.warehouse_table = QTableWidget()
+        self.warehouse_table.setColumnCount(len(headers) - 1)
+        self.warehouse_table.setHorizontalHeaderLabels(headers[:-1])
+        tables_layout.addWidget(self.warehouse_table)
+
+        # Table for showing quantities to be added to the order
+        self.order_table = QTableWidget()
+        self.order_table.setColumnCount(1)
+        self.order_table.setHorizontalHeaderLabels([headers[-1]])
+        tables_layout.addWidget(self.order_table)
+
+        layout.addLayout(tables_layout)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+        self.update_warehouse_table()
+
+    def connect_db(self):
+        return psycopg2.connect(
+            dbname='Warehouses',
+            user='shava',
+            password='XsMyVs1420!?',
+            host='127.0.0.1',
+            port='5432'
+        )
+
+    def load_warehouses(self):
+        try:
+            connection = self.connect_db()
+            cursor = connection.cursor()
+            cursor.execute("SELECT id, name FROM Warehouses")
+            warehouses = cursor.fetchall()
+            connection.close()
+
+            for warehouse in warehouses:
+                self.combo_box.addItem(warehouse[1], warehouse[0])
+        except Exception as e:
+            print(f"Error loading warehouses: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки складов: {e}")
+
+    def update_warehouse_table(self):
+        warehouse_id = self.combo_box.currentData()
+        if warehouse_id is not None:
+            try:
+                connection = self.connect_db()
+                cursor = connection.cursor()
+                cursor.execute(self.query['select'], (warehouse_id,))
+                products = cursor.fetchall()
+                connection.close()
+
+                self.warehouse_table.setRowCount(len(products))
+                self.order_table.setRowCount(len(products))
+
+                for i, product in enumerate(products):
+                    for j, value in enumerate(product):
+                        self.warehouse_table.setItem(i, j, QTableWidgetItem(str(value)))
+                    self.order_table.setItem(i, 0, QTableWidgetItem('0'))
+            except Exception as e:
+                print(f"Error updating warehouse table: {e}")
+                QMessageBox.critical(self, "Ошибка", f"Ошибка обновления таблицы склада: {e}")
+
+    def closeEvent(self, event):
+        print(f"Closing {self.windowTitle()}...")
+        try:
+            self.db.close()
+        except Exception as e:
+            print(f"Error closing database connection: {e}")
+        event.accept()
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -414,98 +509,124 @@ class SalesWindow(QMainWindow):
         # Implement saving changes if needed
         pass
 
-class AddProductWindow(QMainWindow):
+class AddProductWindow(BaseProductWindow):
     def __init__(self, order_id, parent=None):
-        super().__init__(parent)
+        query = {
+            'select': """SELECT product_name, amount, price FROM ProductInWarehouse WHERE warehouse_id = %s""",
+            'insert': """INSERT INTO Order_items (order_id, product_name, quantity, price) VALUES (%s, %s, %s, %s)"""
+        }
+        headers = ['Товар', 'Количество', 'Цена', 'Количество в заказ']
+        super().__init__('Добавить товары в заказ', (600, 200, 1000, 600), headers, query, parent)
         self.order_id = order_id
-        self.setWindowTitle('Добавить товары в заказ')
-        self.setGeometry(600, 200, 1000, 600)  
-
-        self.db = Database()  # Make sure this is the correct way to connect to your DB
-
-        layout = QVBoxLayout()
-
-        # ComboBox for selecting warehouse
-        self.combo_box = QComboBox()
-        self.load_warehouses()
-        self.combo_box.currentIndexChanged.connect(self.update_warehouse_table)
-        layout.addWidget(self.combo_box)
-
-        # Horizontal layout for the two tables
-        tables_layout = QHBoxLayout()
-
-        # Table for displaying products from the selected warehouse
-        self.warehouse_table = QTableWidget()
-        self.warehouse_table.setColumnCount(3)
-        self.warehouse_table.setHorizontalHeaderLabels(['Товар', 'Количество', 'Цена'])
-        tables_layout.addWidget(self.warehouse_table)
-
-        # Table for showing quantities to be added to the order
-        self.order_table = QTableWidget()
-        self.order_table.setColumnCount(1)
-        self.order_table.setHorizontalHeaderLabels(['Количество в заказ'])
-        tables_layout.addWidget(self.order_table)
-
-        layout.addLayout(tables_layout)
 
         # Button to add products to the order
         self.add_button = QPushButton('Добавить')
         self.add_button.clicked.connect(self.add_products_to_order)
+        layout = self.centralWidget().layout()
         layout.addWidget(self.add_button)
-
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
-
-        self.update_warehouse_table()
-
-    def load_warehouses(self):
-        warehouses = self.db.get_warehouses()
-        for warehouse in warehouses:
-            self.combo_box.addItem(warehouse[1], warehouse[0])
-
-    def update_warehouse_table(self):
-        warehouse_id = self.combo_box.currentData()
-        if warehouse_id is not None:
-            products = self.db.get_products_by_warehouse(warehouse_id)
-            self.warehouse_table.setRowCount(len(products))
-            self.order_table.setRowCount(len(products))
-
-            for i, product in enumerate(products):
-                self.warehouse_table.setItem(i, 0, QTableWidgetItem(product[0]))
-                self.warehouse_table.setItem(i, 1, QTableWidgetItem(str(product[1])))
-                self.warehouse_table.setItem(i, 2, QTableWidgetItem(str(product[2])))
-
-                # Initialize order_table
-                self.order_table.setItem(i, 0, QTableWidgetItem('0'))
 
     def add_products_to_order(self):
         warehouse_id = self.combo_box.currentData()
         if warehouse_id:
-            products = self.db.get_products_by_warehouse(warehouse_id)
             try:
-                for i, product in enumerate(products):
+                connection = self.connect_db()
+                cursor = connection.cursor()
+                connection.autocommit = False
+
+                for i in range(self.warehouse_table.rowCount()):
+                    product_name = self.warehouse_table.item(i, 0).text()
                     quantity = int(self.order_table.item(i, 0).text())
+                    price = float(self.warehouse_table.item(i, 2).text())
                     if quantity > 0:
-                        self.db.cursor.execute("""
-                            INSERT INTO Order_items (order_id, product_name, quantity, price)
-                            VALUES (%s, %s, %s, %s)
-                        """, (self.order_id, product[0], quantity, product[2]))
-                        self.db.conn.commit()
+                        cursor.execute(self.query['insert'], (self.order_id, product_name, quantity, price))
+
+                connection.commit()
+                connection.close()
                 QMessageBox.information(self, 'Успех', 'Товары добавлены в заказ.')
             except Exception as e:
+                if connection:
+                    connection.rollback()
                 print(f"Error adding products to order: {e}")
-                QMessageBox.critical(self, 'Error', f'Error adding products to order: {e}')
+                QMessageBox.critical(self, 'Ошибка', f'Ошибка добавления товаров в заказ: {e}')
         else:
             QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите склад.')
 
-    def closeEvent(self, event):
-        print("Closing AddProductWindow...")
+
+class WriteOffProductWindow(BaseProductWindow):
+    def __init__(self):
+        query = {
+            'select': """SELECT product_name, amount, price FROM ProductInWarehouse WHERE warehouse_id = %s""",
+            'insert': """UPDATE ProductInWarehouse SET amount = amount - %s WHERE warehouse_id = %s AND product_name = %s AND amount >= %s"""
+        }
+        headers = ['Товар', 'Количество в наличии', 'Цена', 'Количество списания']
+        super().__init__('Списание товаров', (600, 200, 1000, 600), headers, query)
+
+        # Create and configure buttons
+        self.writeoff_button = QPushButton('Списать товары')
+        self.writeoff_button.clicked.connect(self.write_off_products)
+
+        self.cancel_button = QPushButton('Отменить')
+        self.cancel_button.clicked.connect(self.cancel_changes)
+
+        self.save_button = QPushButton('Сохранить')
+        self.save_button.clicked.connect(self.save_changes)
+
+        # Add buttons to layout
+        layout = self.centralWidget().layout()
+        layout.addWidget(self.writeoff_button)
+        layout.addWidget(self.cancel_button)
+        layout.addWidget(self.save_button)
+
+    def write_off_products(self):
+        warehouse_id = self.combo_box.currentData()
+        if warehouse_id:
+            try:
+                connection = self.connect_db()
+                cursor = connection.cursor()
+                connection.autocommit = False
+
+                for i in range(self.warehouse_table.rowCount()):
+                    product_name = self.warehouse_table.item(i, 0).text()
+                    write_off_amount = int(self.order_table.item(i, 0).text())
+                    if write_off_amount > 0:
+                        cursor.execute(self.query['insert'], (write_off_amount, warehouse_id, product_name, write_off_amount))
+
+                connection.commit()
+                connection.close()
+                QMessageBox.information(self, 'Успех', 'Товары списаны со склада.')
+            except Exception as e:
+                if connection:
+                    connection.rollback()
+                print(f"Error writing off products: {e}")
+                QMessageBox.critical(self, 'Ошибка', f'Ошибка списания товаров: {e}')
+        else:
+            QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите склад.')
+
+    def cancel_changes(self):
+        self.update_warehouse_table()
+        QMessageBox.information(self, 'Успех', 'Изменения успешно откатаны')
+
+    def save_changes(self):
         try:
-            self.db.close()
+            connection = self.connect_db()
+            cursor = connection.cursor()
+            connection.autocommit = False
+
+            for i in range(self.warehouse_table.rowCount()):
+                product_name = self.warehouse_table.item(i, 0).text()
+                write_off_amount = int(self.order_table.item(i, 0).text())
+                if write_off_amount > 0:
+                    cursor.execute(self.query['insert'], (write_off_amount, warehouse_id, product_name, write_off_amount))
+
+            connection.commit()
+            connection.close()
+            QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
         except Exception as e:
-            print(f"Error closing database connection: {e}")
-        event.accept()
+            if connection:
+                connection.rollback()
+            print(f"Error saving changes: {e}")
+            QMessageBox.critical(self, 'Ошибка', f'Ошибка сохранения изменений: {e}')
+
 
 class CurrentOrderWindow(QMainWindow):
     def __init__(self, parent=None):
@@ -786,83 +907,6 @@ class TransferWindow(QMainWindow):
                 connection.rollback()
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
 
-class WriteOffProductWindow(BaseWindow):
-    def __init__(self):
-        query = {
-            'select': """SELECT product_name, amount, price FROM ProductInWarehouse WHERE warehouse_id = %s""",
-            'insert': """UPDATE ProductInWarehouse SET amount = amount - %s WHERE warehouse_id = %s AND product_name = %s AND amount >= %s""",
-            'delete': """DELETE FROM ProductInWarehouse WHERE warehouse_id = %s AND product_name = %s"""
-        }
-        headers = ['Товар', 'Количество в наличии', 'Цена', 'Количество списания']
-        super().__init__('Списание товаров', (600, 200, 1000, 600), headers, 4, query)
-
-        # Create and configure combo box for selecting warehouse
-        self.combo_box = QComboBox()
-        self.load_warehouses()
-        self.combo_box.currentIndexChanged.connect(self.update_warehouse_table)
-
-        # Create and configure write-off button
-        self.writeoff_button = QPushButton('Списать товары')
-        self.writeoff_button.clicked.connect(self.write_off_products)
-
-        # Add widgets to layout
-        layout = self.centralWidget().layout()  # Get the layout of the central widget
-        layout.insertWidget(0, self.combo_box)
-        layout.addWidget(self.writeoff_button)
-
-    def load_warehouses(self):
-        try:
-            connection = self.connect_db()
-            cursor = connection.cursor()
-            cursor.execute("SELECT id, name FROM Warehouses")  # Correct table name
-            warehouses = cursor.fetchall()
-            connection.close()
-
-            if not warehouses:
-                print("No warehouses found.")
-            for warehouse in warehouses:
-                self.combo_box.addItem(warehouse[1], warehouse[0])
-        except Exception as e:
-            print(f"Error loading warehouses: {e}")
-            QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки складов: {e}")
-
-    def update_warehouse_table(self):
-        warehouse_id = self.combo_box.currentData()
-        if warehouse_id is not None:
-            query = self.query['select'] % warehouse_id
-            self.update_table(query, self.headers)
-            # Add a new column for write-off quantities
-            for i in range(self.table_widget.rowCount()):
-                self.table_widget.setItem(i, 3, QTableWidgetItem('0'))
-        else:
-            print("No warehouse selected.")
-
-    def write_off_products(self):
-        try:
-            warehouse_id = self.combo_box.currentData()
-            if warehouse_id:
-                connection = self.connect_db()
-                cursor = connection.cursor()
-                connection.autocommit = False
-
-                for i in range(self.table_widget.rowCount()):
-                    product_name = self.table_widget.item(i, 0).text()
-                    current_amount = int(self.table_widget.item(i, 1).text())
-                    write_off_amount = int(self.table_widget.item(i, 3).text())
-                    if write_off_amount > 0 and write_off_amount <= current_amount:
-                        cursor.execute(self.query['insert'], (write_off_amount, warehouse_id, product_name, write_off_amount))
-                
-                connection.commit()
-                connection.close()
-                QMessageBox.information(self, 'Успех', 'Товары списаны со склада.')
-            else:
-                QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите склад.')
-        except Exception as e:
-            if connection:
-                connection.rollback()
-            print(f"Error writing off products: {e}")
-            QMessageBox.critical(self, 'Ошибка', f'Ошибка списания товаров: {e}')
-
 class ReceivingWindow(BaseWindow):
     def __init__(self):
         query = {
@@ -984,8 +1028,6 @@ class BaseWindow(QMainWindow):
         self.save_button = QPushButton('Сохранить')
         self.save_button.clicked.connect(self.save_changes)
         button_layout.addWidget(self.save_button)
-
-        layout.addLayout(button_layout)
 
         container = QWidget()
         container.setLayout(layout)
@@ -1117,7 +1159,6 @@ class ClientWindow(BaseWindow):
             UPDATE Clients SET name = %s, orders = %s, info = %s, phonenumber = %s, address = %s
             WHERE id = %s
         """
-
 
 class WarehouseWindow(BaseWindow):
     def __init__(self):
