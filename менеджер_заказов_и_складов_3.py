@@ -1,16 +1,15 @@
 import sys
 import psycopg2
-
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
     QLabel, QLineEdit
 )
 from psycopg2 import OperationalError, sql
+
 class GlobalData:
     username = None
     password = None
-
 
 class LoginWindow(QMainWindow):
     def __init__(self):
@@ -41,16 +40,14 @@ class LoginWindow(QMainWindow):
         self.login_button.clicked.connect(self.open_main_window)
 
     def open_main_window(self):
+        GlobalData.username = self.username_input.text()
+        GlobalData.password = self.password_input.text()
         try:
             self.main_window = MainWindow()
             self.main_window.show()
-            GlobalData.username = self.username_input.text()
-            GlobalData.password = self.password_input.text()
             self.close()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to open Main Window: {e}")
-
-
 
 class Database():
     def __init__(self):
@@ -62,14 +59,14 @@ class Database():
         self.conn = None
         self.cursor = None
 
-
     def __enter__(self):
         try:
             self.conn = psycopg2.connect(
                 dbname=self.dbname,
                 user=self.user,
                 password=self.password,
-                host=self.host
+                host=self.host,
+                port=self.port
             )
             self.cursor = self.conn.cursor()
             print("Database connection successful.")
@@ -77,7 +74,7 @@ class Database():
             print(f"Error connecting to the database: {e}")
             QMessageBox.critical(None, "Database Error", f"Error connecting to the database: {e}")
             sys.exit(1)
-
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.cursor:
@@ -88,60 +85,177 @@ class Database():
             print(f"An error occurred: {exc_val}")
         return False
 
-
     def get_orders(self):
-        with self():
-            try:
+        try:
+            with self as db:
                 query = """
                 SELECT o.id, c.name 
                 FROM Orders o 
                 JOIN Clients c ON o.client_id = c.id
                 """
-                self.cursor.execute(query)
-                result = self.cursor.fetchall()
+                db.cursor.execute(query)
+                result = db.cursor.fetchall()
                 return result
-
-            except Exception as e:
-                print(f"Error fetching orders: {e}")
-                return []
+        except Exception as e:
+            print(f"Error fetching orders: {e}")
+            return []
 
     def get_products_by_order(self, order_id):
-        with self:
-            try:
+        try:
+            with self as db:
                 query = """
                 SELECT p.name, oi.amount, oi.price 
                 FROM Order_items oi 
                 JOIN Products p ON oi.product_id = p.id 
                 WHERE oi.order_id = %s
                 """
-                self.cursor.execute(query, (order_id,))
-                result = self.cursor.fetchall()
+                db.cursor.execute(query, (order_id,))
+                result = db.cursor.fetchall()
                 return result
-            except Exception as e:
-                print(f"Error fetching products by order: {e}")
-                return []
+        except Exception as e:
+            print(f"Error fetching products by order: {e}")
+            return []
 
     def get_warehouses(self):
-        with self:
-            try:
-                self.cursor.execute("SELECT id, name FROM Warehouses")
-                result = self.cursor.fetchall()
+        try:
+            with self as db:
+                db.cursor.execute("SELECT id, name FROM Warehouses")
+                result = db.cursor.fetchall()
                 return result
-            except Exception as e:
-                print(f"Error fetching warehouses: {e}")
-                return []
+        except Exception as e:
+            print(f"Error fetching warehouses: {e}")
+            return []
 
     def get_warehouse_id_by_name(self, name):
-        with self:
-            try:
-                self.cursor.execute("SELECT id FROM Warehouse WHERE name = %s", (name,))
-                result = self.cursor.fetchone()
-                self.__exit__()
+        try:
+            with self as db:
+                db.cursor.execute("SELECT id FROM Warehouses WHERE name = %s", (name,))
+                result = db.cursor.fetchone()
                 return result[0] if result else None
-            except Exception as e:
-                print(f"Ошибка при получении ID склада: {e}")
-                return None
+        except Exception as e:
+            print(f"Ошибка при получении ID склада: {e}")
+            return None
 
+class BaseWindow(QMainWindow):
+    def __init__(self, title, geometry, headers, num_columns, query):
+        super().__init__()
+        self.setWindowTitle(title)
+        self.setGeometry(*geometry)
+        self.query = query
+        self.headers = headers
+        self.changes = []
+
+        # Set up table widget
+        self.table_widget = QTableWidget()
+        self.table_widget.setColumnCount(num_columns)
+        self.table_widget.setHorizontalHeaderLabels(headers)
+
+        # Create layout and add table widget
+        layout = QVBoxLayout()
+        layout.addWidget(self.table_widget)
+
+        # Create and add buttons
+        button_layout = QHBoxLayout()
+        self.add_button = QPushButton('Добавить')
+        self.delete_button = QPushButton('Удалить')
+        self.cancel_button = QPushButton('Отменить')
+        self.save_button = QPushButton('Сохранить')
+
+        button_layout.addWidget(self.add_button)
+        button_layout.addWidget(self.delete_button)
+        button_layout.addWidget(self.cancel_button)
+        button_layout.addWidget(self.save_button)
+
+        layout.addLayout(button_layout)
+
+        # Set central widget
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+        # Connect button actions
+        self.add_button.clicked.connect(self.add_item)
+        self.delete_button.clicked.connect(self.delete_item)
+        self.cancel_button.clicked.connect(self.cancel_changes)
+        self.save_button.clicked.connect(self.save_changes)
+
+    def connect_db(self):
+        try:
+            return psycopg2.connect(
+                dbname='Warehouses',
+                user=GlobalData.username,
+                password=GlobalData.password,
+                host='127.0.0.1',
+                port='5432'
+            )
+        except Exception as e:
+            QMessageBox.critical(self, 'Ошибка', f'Не удалось подключиться к базе данных: {e}')
+            raise
+
+    def update_table(self, query, headers):
+        try:
+            connection = self.connect_db()
+            cursor = connection.cursor()
+            cursor.execute(query)
+            items = cursor.fetchall()
+            connection.close()
+
+            self.table_widget.setRowCount(len(items))
+            self.table_widget.setColumnCount(len(headers))
+            self.table_widget.setHorizontalHeaderLabels(headers)
+            for i, item in enumerate(items):
+                for j, value in enumerate(item):
+                    self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
+        except Exception as e:
+            QMessageBox.critical(self, 'Ошибка', f'Ошибка при загрузке данных: {e}')
+
+    def add_item(self):
+        row_position = self.table_widget.rowCount()
+        self.table_widget.insertRow(row_position)
+        self.changes.append(('insert', row_position, [self.table_widget.item(row_position, i).text() for i in range(self.table_widget.columnCount())]))
+        QMessageBox.information(self, 'Успех', 'Запись успешно добавлена!')
+
+    def delete_item(self):
+        selected_row = self.table_widget.currentRow()
+        if selected_row >= 0:
+            id_item = self.table_widget.item(selected_row, 0)
+            if id_item:
+                self.changes.append(('delete', id_item.text(), None))
+            self.table_widget.removeRow(selected_row)
+            QMessageBox.information(self, 'Успех', 'Запись успешно удалена!')
+
+    def cancel_changes(self):
+        self.update_table(self.query['select'], self.table_widget.horizontalHeaderLabels())
+        self.changes.clear()
+        QMessageBox.information(self, 'Успех', 'Изменения успешно отменены')
+
+    def save_changes(self):
+        connection = None
+        try:
+            connection = self.connect_db()
+            cursor = connection.cursor()
+            connection.autocommit = False
+
+            for change in self.changes:
+                change_type, row_id, row_data = change
+                if change_type == 'insert':
+                    cursor.execute(self.query['insert'], row_data)
+                elif change_type == 'delete':
+                    cursor.execute(self.query['delete'], (row_id,))
+                elif change_type == 'update':
+                    cursor.execute(self.query['update'], row_data)
+
+            connection.commit()
+            connection.close()
+            self.changes.clear()
+            QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
+        except Exception as e:
+            if connection:
+                connection.rollback()
+            QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при сохранении: {e}')
+
+    def closeEvent(self, event):
+        super().closeEvent(event)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -174,76 +288,71 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
     def open_sales_window(self):
-        try:
-            self.sales_window = SalesWindow()
-            self.sales_window.show()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to open Sales Window: {e}")
+        self.sales_window = SalesWindow()
+        self.sales_window.show()
 
     def open_receiving_window(self):
-        try:
-            self.receiving_window = ReceivingWindow()
-            self.receiving_window.show()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to open Receiving Window: {e}")
+        self.receiving_window = ReceivingWindow()
+        self.receiving_window.show()
 
     def open_transfer_window(self):
-        try:
-            self.transfer_window = TransferWindow()
-            self.transfer_window.show()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to open Transfer Window: {e}")
+        self.transfer_window = TransferWindow()
+        self.transfer_window.show()
 
     def open_write_off_window(self):
-        try:
-            self.write_off_window = WriteOffProductWindow()
-            self.write_off_window.show()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to open Write Off Window: {e}")
+        self.write_off_window = WriteOffProductWindow()
+        self.write_off_window.show()
 
     def open_clients_window(self):
         try:
             self.client_window = ClientWindow()
             self.client_window.show()
         except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', f'Ошибка в открытии окна клиентов: {e}')
+            QMessageBox.critical(self, 'Ошибка', f'Ошибка открытия окна с клиентами: {e}')
 
     def open_warehouses_window(self):
         try:
             self.warehouse_window = WarehouseWindow()
             self.warehouse_window.show()
         except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', f'Ошибка в открытии окна складов: {e}')
+            QMessageBox.critical(self, 'Ошибка', f'Ошибка открытия окна со складами: {e}')
 
     def open_documents_window(self):
-        QMessageBox.information(self, "Документы", "Функционал документов еще не реализован.")
+        pass
 
     def open_templates_window(self):
-        QMessageBox.information(self, "Шаблоны", "Функционал шаблонов еще не реализован.")
+        pass
 
 class SalesWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setWindowTitle("Продажа товаров")
         self.setGeometry(600, 200, 800, 600)
 
+        self.db = Database()
+
         layout = QVBoxLayout()
 
-        self.combo_box = QComboBox()
-        self.load_orders()
-        self.combo_box.currentIndexChanged.connect(self.update_table)
-        layout.addWidget(self.combo_box)
+        # ComboBox для выбора заказа
+        self.orders_combo = QComboBox()
+        layout.addWidget(self.orders_combo)
+        self.orders_combo.currentIndexChanged.connect(self.update_table)
 
+        # Кнопка для открытия текущих заказов
         self.orders_button = QPushButton("Текущие заказы")
         self.orders_button.clicked.connect(self.open_current_orders_window)
         layout.addWidget(self.orders_button)
 
+        # Кнопка для добавления товаров
         self.add_button = QPushButton("Добавить товары")
+        self.add_button.clicked.connect(self.open_add_product_window)
         layout.addWidget(self.add_button)
 
+        # Таблица для отображения товаров в заказе
         self.table_widget = QTableWidget()
         layout.addWidget(self.table_widget)
 
+        # Кнопки для удаления товаров и подтверждения изменений
         button_layout = QHBoxLayout()
 
         self.delete_button = QPushButton("Удалить товары из заказа")
@@ -258,45 +367,56 @@ class SalesWindow(QMainWindow):
         container.setLayout(layout)
         self.setCentralWidget(container)
 
-        self.add_button.clicked.connect(self.open_add_product_window)
-
+        self.load_orders()
         self.update_table()
+
+    def load_orders(self):
+        try:
+            orders = self.db.get_orders()
+            self.orders_combo.clear()  # Очистить старые элементы
+            for order in orders:
+                self.orders_combo.addItem(f"Order {order[0]} - {order[1]}", order[0])
+        except Exception as e:
+            print(f"Error loading orders: {e}")
+            QMessageBox.critical(self, "Error", f"Error loading orders: {e}")
+
+    def update_table(self):
+        try:
+            order_id = self.orders_combo.currentData()
+            products = self.db.get_products_by_order(order_id)
+            self.table_widget.setRowCount(len(products))
+            self.table_widget.setColumnCount(3)
+            self.table_widget.setHorizontalHeaderLabels(["Product", "Amount", "Price"])
+            for i, (name, amount, price) in enumerate(products):
+                self.table_widget.setItem(i, 0, QTableWidgetItem(name))
+                self.table_widget.setItem(i, 1, QTableWidgetItem(str(amount)))
+                self.table_widget.setItem(i, 2, QTableWidgetItem(str(price)))
+        except Exception as e:
+            print(f"Error updating table: {e}")
+            QMessageBox.critical(self, "Error", f"Error updating table: {e}")
 
     def open_current_orders_window(self):
         try:
-            self.current_orders_window = CurrentOrderWindow()
+            self.current_orders_window = CurrentOrderWindow(self)  # Укажите родительское окно
             self.current_orders_window.show()
         except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', f'Ошибка в открытии окна текущих заказов: {e}')
-
-    def load_orders(self):
-        db = Database()
-        orders = db.get_orders()
-        db.close()
-        for order in orders:
-            self.combo_box.addItem(order[1], order[0])
-
-    def update_table(self):
-        order_id = self.combo_box.currentData()
-        db = Database()
-        products = db.get_products_by_order(order_id)
-        db.close()
-        self.table_widget.setRowCount(len(products))
-        self.table_widget.setColumnCount(3)
-        self.table_widget.setHorizontalHeaderLabels(["Товар", "Количество", "Цена"])
-        for i, product in enumerate(products):
-            self.table_widget.setItem(i, 0, QTableWidgetItem(product[0]))
-            self.table_widget.setItem(i, 1, QTableWidgetItem(str(product[1])))
-            self.table_widget.setItem(i, 2, QTableWidgetItem(str(product[2])))
+            QMessageBox.critical(self, 'Error', f'Error opening current orders window: {e}')
 
     def open_add_product_window(self):
-        order_id = self.combo_box.currentData()
-        self.add_product_window = AddProductWindow(order_id)
-        self.add_product_window.show()
+        try:
+            order_id = self.orders_combo.currentData()
+            self.add_product_window = AddProductWindow(order_id, self)  # Укажите родительское окно
+            self.add_product_window.show()
+        except Exception as e:
+            QMessageBox.critical(self, 'Error', f'Error opening add product window: {e}')
+
+    def save_changes(self):
+        # Implement saving changes if needed
+        pass
 
 class AddProductWindow(QMainWindow):
-    def __init__(self, order_id):
-        super().__init__()
+    def __init__(self, order_id, parent=None):
+        super().__init__(parent)
         self.order_id = order_id
         self.setWindowTitle('Добавить товары в заказ')
         self.setGeometry(600, 200, 1000, 600)  
@@ -363,25 +483,33 @@ class AddProductWindow(QMainWindow):
         warehouse_id = self.combo_box.currentData()
         if warehouse_id:
             products = self.db.get_products_by_warehouse(warehouse_id)
-            for i, product in enumerate(products):
-                quantity = int(self.order_table.item(i, 0).text())
-                if quantity > 0:
-                    self.db.cursor.execute("""
-                        INSERT INTO Order_items (order_id, product_name, quantity, price)
-                        VALUES (%s, %s, %s, %s)
-                    """, (self.order_id, product[0], quantity, product[2]))
-                    self.db.conn.commit()
-            QMessageBox.information(self, 'Успех', 'Товары добавлены в заказ.')
+            try:
+                for i, product in enumerate(products):
+                    quantity = int(self.order_table.item(i, 0).text())
+                    if quantity > 0:
+                        self.db.cursor.execute("""
+                            INSERT INTO Order_items (order_id, product_name, quantity, price)
+                            VALUES (%s, %s, %s, %s)
+                        """, (self.order_id, product[0], quantity, product[2]))
+                        self.db.conn.commit()
+                QMessageBox.information(self, 'Успех', 'Товары добавлены в заказ.')
+            except Exception as e:
+                print(f"Error adding products to order: {e}")
+                QMessageBox.critical(self, 'Error', f'Error adding products to order: {e}')
         else:
             QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите склад.')
 
     def closeEvent(self, event):
-        self.db.close()
-        super().closeEvent(event)
+        print("Closing AddProductWindow...")
+        try:
+            self.db.close()
+        except Exception as e:
+            print(f"Error closing database connection: {e}")
+        event.accept()
 
 class CurrentOrderWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.setWindowTitle('Текущие заказы')
         self.setGeometry(600, 200, 800, 600)
 
@@ -658,224 +786,180 @@ class TransferWindow(QMainWindow):
                 connection.rollback()
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
 
-class WriteOffProductWindow(QMainWindow):
+class WriteOffProductWindow(BaseWindow):
     def __init__(self):
-        super().__init__()
-        self.setWindowTitle('Списание товаров')
-        self.setGeometry(600, 200, 1000, 600)  # Set the window size
+        query = {
+            'select': """SELECT product_name, amount, price FROM ProductInWarehouse WHERE warehouse_id = %s""",
+            'insert': """UPDATE ProductInWarehouse SET amount = amount - %s WHERE warehouse_id = %s AND product_name = %s AND amount >= %s""",
+            'delete': """DELETE FROM ProductInWarehouse WHERE warehouse_id = %s AND product_name = %s"""
+        }
+        headers = ['Товар', 'Количество в наличии', 'Цена', 'Количество списания']
+        super().__init__('Списание товаров', (600, 200, 1000, 600), headers, 4, query)
 
-        self.db = Database()  # Connect to the database
-
-        layout = QVBoxLayout()
-
-        # ComboBox for selecting warehouse
+        # Create and configure combo box for selecting warehouse
         self.combo_box = QComboBox()
         self.load_warehouses()
         self.combo_box.currentIndexChanged.connect(self.update_warehouse_table)
-        layout.addWidget(self.combo_box)
 
-        # Horizontal layout for the two tables
-        tables_layout = QHBoxLayout()
-
-        # Table for displaying products from the selected warehouse
-        self.warehouse_table = QTableWidget()
-        self.warehouse_table.setColumnCount(3)
-        self.warehouse_table.setHorizontalHeaderLabels(['Товар', 'Количество', 'Цена'])
-        tables_layout.addWidget(self.warehouse_table)
-
-        # Table for showing quantities to be written off
-        self.writeoff_table = QTableWidget()
-        self.writeoff_table.setColumnCount(1)
-        self.writeoff_table.setHorizontalHeaderLabels(['Количество списания'])
-        tables_layout.addWidget(self.writeoff_table)
-
-        layout.addLayout(tables_layout)
-
-        # Button to write off products from the warehouse
+        # Create and configure write-off button
         self.writeoff_button = QPushButton('Списать товары')
         self.writeoff_button.clicked.connect(self.write_off_products)
+
+        # Add widgets to layout
+        layout = self.centralWidget().layout()  # Get the layout of the central widget
+        layout.insertWidget(0, self.combo_box)
         layout.addWidget(self.writeoff_button)
 
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
-
-        self.update_warehouse_table()
-
     def load_warehouses(self):
-        warehouses = self.db.get_warehouses()
-        for warehouse in warehouses:
-            self.combo_box.addItem(warehouse[1], warehouse[0])
+        try:
+            connection = self.connect_db()
+            cursor = connection.cursor()
+            cursor.execute("SELECT id, name FROM Warehouses")  # Correct table name
+            warehouses = cursor.fetchall()
+            connection.close()
+
+            if not warehouses:
+                print("No warehouses found.")
+            for warehouse in warehouses:
+                self.combo_box.addItem(warehouse[1], warehouse[0])
+        except Exception as e:
+            print(f"Error loading warehouses: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки складов: {e}")
 
     def update_warehouse_table(self):
         warehouse_id = self.combo_box.currentData()
         if warehouse_id is not None:
-            products = self.db.get_products_by_warehouse(warehouse_id)
-            self.warehouse_table.setRowCount(len(products))
-            self.writeoff_table.setRowCount(len(products))
-
-            for i, product in enumerate(products):
-                self.warehouse_table.setItem(i, 0, QTableWidgetItem(product[0]))
-                self.warehouse_table.setItem(i, 1, QTableWidgetItem(str(product[1])))
-                self.warehouse_table.setItem(i, 2, QTableWidgetItem(str(product[2])))
-
-                # Initialize writeoff_table
-                self.writeoff_table.setItem(i, 0, QTableWidgetItem('0'))
+            query = self.query['select'] % warehouse_id
+            self.update_table(query, self.headers)
+            # Add a new column for write-off quantities
+            for i in range(self.table_widget.rowCount()):
+                self.table_widget.setItem(i, 3, QTableWidgetItem('0'))
+        else:
+            print("No warehouse selected.")
 
     def write_off_products(self):
-        warehouse_id = self.combo_box.currentData()
-        if warehouse_id:
-            products = self.db.get_products_by_warehouse(warehouse_id)
-            for i, product in enumerate(products):
-                quantity = int(self.writeoff_table.item(i, 0).text())
-                if quantity > 0:
-                    self.db.cursor.execute("""
-                        UPDATE ProductInWarehouse
-                        SET amount = amount - %s
-                        WHERE warehouse_id = %s AND product_name = %s AND amount >= %s
-                    """, (quantity, warehouse_id, product[0], quantity))
-                    self.db.conn.commit()
-            QMessageBox.information(self, 'Успех', 'Товары списаны со склада.')
-        else:
-            QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите склад.')
-
-    def closeEvent(self, event):
-        self.db.close()
-        super().closeEvent(event)
-
-class ReceivingWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle('Приёмка товаров')
-        self.setGeometry(600, 200, 800, 600)
-
-        self.db = Database()
-        self.changes = []  # For tracking changes
-
-        layout = QVBoxLayout()
-
-        self.combo_box = QComboBox()
-        self.load_warehouses()
-        self.combo_box.currentIndexChanged.connect(self.update_table)
-        layout.addWidget(self.combo_box)
-
-        # For displaying products in the selected warehouse
-        self.table_widget = QTableWidget()
-        layout.addWidget(self.table_widget)
-
-        # Buttons for operations
-        button_layout = QHBoxLayout()
-
-        self.add_button = QPushButton('Добавить')
-        self.add_button.clicked.connect(self.add_product)
-        button_layout.addWidget(self.add_button)
-
-        self.delete_button = QPushButton('Удалить')
-        self.delete_button.clicked.connect(self.delete_product)
-        button_layout.addWidget(self.delete_button)
-
-        self.cancel_button = QPushButton('Отменить')
-        self.cancel_button.clicked.connect(self.cancel_changes)
-        button_layout.addWidget(self.cancel_button)
-
-        self.save_button = QPushButton('Сохранить')
-        self.save_button.clicked.connect(self.save_changes)
-        button_layout.addWidget(self.save_button)
-
-        layout.addLayout(button_layout)
-
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
-
-        self.update_table()
-
-    def load_warehouses(self):
-        warehouses = self.db.get_warehouses()
-        for warehouse in warehouses:
-            self.combo_box.addItem(warehouse[1], warehouse[0])
-
-    def update_table(self):
-        warehouse_id = self.combo_box.currentData()
-        if warehouse_id is not None:
-            products = self.db.get_products_by_warehouse(warehouse_id)
-            self.table_widget.setRowCount(len(products))
-            self.table_widget.setColumnCount(3)
-            self.table_widget.setHorizontalHeaderLabels(['Товар', 'Количество', 'Цена'])
-            for i, product in enumerate(products):
-                self.table_widget.setItem(i, 0, QTableWidgetItem(product[0]))
-                self.table_widget.setItem(i, 1, QTableWidgetItem(str(product[1])))
-                self.table_widget.setItem(i, 2, QTableWidgetItem(str(product[2])))
-
-    def add_product(self):
-        row_position = self.table_widget.rowCount()
-        self.table_widget.insertRow(row_position)
-        self.table_widget.setItem(row_position, 0, QTableWidgetItem('Новый товар'))
-        self.table_widget.setItem(row_position, 1, QTableWidgetItem('0'))
-        self.table_widget.setItem(row_position, 2, QTableWidgetItem('0'))
-        self.changes.append(('insert', row_position, ['Новый товар', 0, 0]))
-        QMessageBox.information(self, 'Успех', 'Товар успешно добавлен!')
-
-    def delete_product(self):
-        selected_row = self.table_widget.currentRow()
-        if selected_row >= 0:
-            self.changes.append(('delete', selected_row, None))
-            self.table_widget.removeRow(selected_row)
-            QMessageBox.information(self, "Успех", "Товар успешно удален!")
-
-    def cancel_changes(self):
-        self.update_table()
-        self.changes.clear()
-        QMessageBox.information(self, "Успех", "Изменения успешно отменены!")
-
-    def save_changes(self):
         try:
             warehouse_id = self.combo_box.currentData()
-            if warehouse_id is not None:
-                connection = psycopg2.connect(
-                    dbname="Warehouses",
-                    user="shava",
-                    password="XsMyVs1420!?",
-                    host="127.0.0.1",
-                    port="5432"
-                )
+            if warehouse_id:
+                connection = self.connect_db()
                 cursor = connection.cursor()
                 connection.autocommit = False
 
-                for change in self.changes:
-                    change_type, row_index, row_data = change
-                    if change_type == 'insert':
-                        product_name = row_data[0]
-                        quantity = int(row_data[1])
-                        price = float(row_data[2])
-                        cursor.execute("""
-                            INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price)
-                            VALUES (%s, %s, %s, %s)
-                        """, (warehouse_id, product_name, quantity, price))
-                    elif change_type == 'delete':
-                        product_name = self.table_widget.item(row_index, 0).text()
-                        cursor.execute("""
-                            DELETE FROM ProductInWarehouse
-                            WHERE warehouse_id = %s AND product_name = %s
-                        """, (warehouse_id, product_name))
-
+                for i in range(self.table_widget.rowCount()):
+                    product_name = self.table_widget.item(i, 0).text()
+                    current_amount = int(self.table_widget.item(i, 1).text())
+                    write_off_amount = int(self.table_widget.item(i, 3).text())
+                    if write_off_amount > 0 and write_off_amount <= current_amount:
+                        cursor.execute(self.query['insert'], (write_off_amount, warehouse_id, product_name, write_off_amount))
+                
                 connection.commit()
                 connection.close()
-                self.changes.clear()
-                QMessageBox.information(self, "Успех", "Изменения успешно сохранены!")
+                QMessageBox.information(self, 'Успех', 'Товары списаны со склада.')
+            else:
+                QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите склад.')
         except Exception as e:
             if connection:
                 connection.rollback()
-            QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
+            print(f"Error writing off products: {e}")
+            QMessageBox.critical(self, 'Ошибка', f'Ошибка списания товаров: {e}')
 
-    def closeEvent(self, event):
-        self.db.close()
-        super().closeEvent(event)
-
-class ClientWindow(QMainWindow):
+class ReceivingWindow(BaseWindow):
     def __init__(self):
+        query = {
+            'select': """SELECT product_name, amount, price FROM ProductInWarehouse WHERE warehouse_id = %s""",
+            'insert': """INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price) VALUES (%s, %s, %s, %s)""",
+            'delete': """DELETE FROM ProductInWarehouse WHERE warehouse_id = %s AND product_name = %s"""
+        }
+        headers = ['Товар', 'Количество', 'Цена']
+        super().__init__('Приёмка товаров', (600, 200, 800, 600), headers, 3, query)
+
+        # Create and configure combo box for selecting warehouse
+        self.combo_box = QComboBox()
+        self.load_warehouses()
+        self.combo_box.currentIndexChanged.connect(self.update_table_with_warehouse)
+
+        # Add combo box to the layout
+        layout = self.centralWidget().layout()  # Get the layout of the central widget
+        layout.insertWidget(0, self.combo_box)
+
+    def load_warehouses(self):
+        try:
+            connection = self.connect_db()
+            cursor = connection.cursor()
+            cursor.execute("SELECT id, name FROM warehouses")  # Ensure the table name is correct
+            warehouses = cursor.fetchall()
+            connection.close()
+
+            if not warehouses:
+                print("No warehouses found.")
+            for warehouse in warehouses:
+                self.combo_box.addItem(warehouse[1], warehouse[0])
+        except Exception as e:
+            print(f"Error loading warehouses: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки складов: {e}")
+
+    def update_table_with_warehouse(self):
+        warehouse_id = self.combo_box.currentData()
+        if warehouse_id is not None:
+            query = self.query['select'] % warehouse_id
+            self.update_table(query, self.headers)
+        else:
+            print("No warehouse selected.")
+
+    def add_item(self):
+        try:
+            super().add_item()
+            self.changes[-1] = ('insert', None, [self.combo_box.currentData(), 'Новый товар', 0, 0])
+            QMessageBox.information(self, 'Успех', 'Товар успешно добавлен!')
+        except Exception as e:
+            print(f"Error adding item: {e}")
+
+    def delete_item(self):
+        try:
+            selected_row = self.table_widget.currentRow()
+            if selected_row >= 0:
+                item_name = self.table_widget.item(selected_row, 0).text()
+                warehouse_id = self.combo_box.currentData()
+                self.changes.append(('delete', warehouse_id, item_name))
+                super().delete_item()  # Use BaseWindow's delete_item method
+        except Exception as e:
+            print(f"Error deleting item: {e}")
+
+    def cancel_changes(self):
+        try:
+            self.update_table_with_warehouse()  # Refresh table with current warehouse data
+            super().cancel_changes()  # Use BaseWindow's cancel_changes method
+        except Exception as e:
+            print(f"Error canceling changes: {e}")
+
+    def save_changes(self):
+        try:
+            connection = self.connect_db()
+            cursor = connection.cursor()
+            connection.autocommit = False
+
+            for change in self.changes:
+                change_type, row_id, row_data = change
+                if change_type == 'insert':
+                    cursor.execute(self.query['insert'], row_data)
+                elif change_type == 'delete':
+                    cursor.execute(self.query['delete'], (row_id, row_data))
+                elif change_type == 'update':
+                    cursor.execute(self.query['update'], row_data)
+
+            connection.commit()
+            connection.close()
+            self.changes.clear()
+            QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
+        except Exception as e:
+            if connection:
+                connection.rollback()
+            QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при сохранении: {e}')
+
+class BaseWindow(QMainWindow):
+    def __init__(self, title, table_headers):
         super().__init__()
-        self.setWindowTitle('Клиенты')
+        self.setWindowTitle(title)
         self.setGeometry(600, 200, 800, 600)
 
         layout = QVBoxLayout()
@@ -886,11 +970,11 @@ class ClientWindow(QMainWindow):
         button_layout = QHBoxLayout()
 
         self.add_button = QPushButton('Добавить')
-        self.add_button.clicked.connect(self.add_client)
+        self.add_button.clicked.connect(self.add_item)
         button_layout.addWidget(self.add_button)
 
         self.delete_button = QPushButton('Удалить')
-        self.delete_button.clicked.connect(self.delete_client)
+        self.delete_button.clicked.connect(self.delete_item)
         button_layout.addWidget(self.delete_button)
 
         self.cancel_button = QPushButton('Отменить')
@@ -907,6 +991,7 @@ class ClientWindow(QMainWindow):
         container.setLayout(layout)
         self.setCentralWidget(container)
 
+        self.table_headers = table_headers
         self.update_table()
         self.changes = []  # Для отслеживания изменений
 
@@ -918,54 +1003,41 @@ class ClientWindow(QMainWindow):
             host='127.0.0.1',
             port='5432'
         )
-    
+
     def update_table(self):
-        try:
-            connection = self.connect_db()
-            cursor = connection.cursor()
-            cursor.execute("""
-                SELECT id, name, orders, info, phonenumber, address
-                FROM Clients 
-            """)
-            clients = cursor.fetchall()
-            connection.close()
+        connection = self.connect_db()
+        if connection:
+            try:
+                cursor = connection.cursor()
+                cursor.execute(self.get_select_query())
+                items = cursor.fetchall()
+                self.table_widget.setRowCount(len(items))
+                self.table_widget.setColumnCount(len(self.table_headers))
+                self.table_widget.setHorizontalHeaderLabels(self.table_headers)
+                for i, item in enumerate(items):
+                    for j, value in enumerate(item):
+                        self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
+            except Exception as e:
+                QMessageBox.critical(self, 'Ошибка', f'Ошибка при загрузке данных: {e}')
+            finally:
+                connection.close()
 
-            self.table_widget.setRowCount(len(clients))
-            self.table_widget.setColumnCount(6)
-            self.table_widget.setHorizontalHeaderLabels(['ID', 'Имя', 'Заказы', 'Инфо',
-                                                          'Номер телефона', 'Адрес'])
-            for i, client in enumerate(clients):
-                self.table_widget.setItem(i, 0, QTableWidgetItem(str(client[0])))
-                self.table_widget.setItem(i, 1, QTableWidgetItem(client[1]))
-                self.table_widget.setItem(i, 2, QTableWidgetItem(client[2]))
-                self.table_widget.setItem(i, 3, QTableWidgetItem(client[3]))
-                self.table_widget.setItem(i, 4, QTableWidgetItem(str(client[4])))
-                self.table_widget.setItem(i, 5, QTableWidgetItem(client[5]))
-        except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', f'Ошибка при загрузке данных: {e}')
-
-    def add_client(self):
+    def add_item(self):
         row_position = self.table_widget.rowCount()
         self.table_widget.insertRow(row_position)
-        self.table_widget.setItem(row_position, 0, QTableWidgetItem(''))  # ID будет автоматически присваиваться
-        self.table_widget.setItem(row_position, 1, QTableWidgetItem('Новое имя'))
-        self.table_widget.setItem(row_position, 2, QTableWidgetItem('Новый заказ'))
-        self.table_widget.setItem(row_position, 3, QTableWidgetItem('Новая информация'))
-        self.table_widget.setItem(row_position, 4, QTableWidgetItem('Новый телефон'))
-        self.table_widget.setItem(row_position, 5, QTableWidgetItem('Новый адрес'))
-        self.changes.append(('insert', None, [
-            'Новое имя', 'Новый заказ', 'Новая информация', 'Новый телефон', 'Новый адрес'
-        ]))
-        QMessageBox.information(self, 'Успех', 'Клиент успешно добавлен!')
+        for i in range(len(self.table_headers)):
+            self.table_widget.setItem(row_position, i, QTableWidgetItem(''))
+        self.changes.append(('insert', None, ['' for _ in range(len(self.table_headers))]))
+        QMessageBox.information(self, 'Успех', 'Элемент успешно добавлен!')
 
-    def delete_client(self):
+    def delete_item(self):
         selected_row = self.table_widget.currentRow()
         if selected_row >= 0:
             id_item = self.table_widget.item(selected_row, 0)
             if id_item:
                 self.changes.append(('delete', id_item.text(), None))
             self.table_widget.removeRow(selected_row)
-            QMessageBox.information(self, 'Успех', 'Клиент успешно удалён!')
+            QMessageBox.information(self, 'Успех', 'Элемент успешно удалён!')
 
     def cancel_changes(self):
         self.update_table()
@@ -981,26 +1053,11 @@ class ClientWindow(QMainWindow):
             for change in self.changes:
                 change_type, row_id, row_data = change
                 if change_type == 'insert':
-                    cursor.execute(
-                        """
-                        INSERT INTO Clients (name, orders, info, phonenumber, address)
-                        VALUES (%s, %s, %s, %s, %s)
-                        """,
-                        (row_data[0], row_data[1], row_data[2], row_data[3], row_data[4])
-                    )
+                    cursor.execute(self.get_insert_query(), row_data)
                 elif change_type == 'delete':
-                    cursor.execute(
-                        "DELETE FROM Clients WHERE id = %s",
-                        (row_id,)
-                    )
+                    cursor.execute(self.get_delete_query(), (row_id,))
                 elif change_type == 'update':
-                    cursor.execute(
-                        """
-                        UPDATE Clients SET name = %s, orders = %s, info = %s, phonenumber = %s, address = %s
-                        WHERE id = %s
-                        """,
-                        (row_data[0], row_data[1], row_data[2], row_data[3], row_data[4], row_id)
-                    )
+                    cursor.execute(self.get_update_query(), row_data + [row_id])
 
             connection.commit()
             connection.close()
@@ -1021,170 +1078,71 @@ class ClientWindow(QMainWindow):
                 row_id_item = self.table_widget.item(row, 0)
                 if row_id_item:
                     row_id = row_id_item.text()
-                    client_data = [
-                        self.table_widget.item(row, 1).text(),
-                        self.table_widget.item(row, 2).text(),
-                        self.table_widget.item(row, 3).text(),
-                        self.table_widget.item(row, 4).text(),
-                        self.table_widget.item(row, 5).text()
-                    ]
-                    self.changes.append(('update', row_id, client_data))
-        
-class WarehouseWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle('Склады')
-        self.setGeometry(600, 200, 800, 600)
+                    item_data = [self.table_widget.item(row, i).text() for i in range(1, len(self.table_headers))]
+                    self.changes.append(('update', row_id, item_data))
 
-        layout = QVBoxLayout()
+    def get_select_query(self):
+        raise NotImplementedError
 
-        self.table_widget = QTableWidget()
-        layout.addWidget(self.table_widget)
+    def get_insert_query(self):
+        raise NotImplementedError
 
-        button_layout = QHBoxLayout()
+    def get_delete_query(self):
+        raise NotImplementedError
 
-        self.add_button = QPushButton('Добавить')
-        self.add_button.clicked.connect(self.add_warehouse)
-        button_layout.addWidget(self.add_button)
-
-        self.delete_button = QPushButton('Удалить')
-        self.delete_button.clicked.connect(self.delete_warehouse)
-        button_layout.addWidget(self.delete_button)
-
-        self.cancel_button = QPushButton('Отменить')
-        self.cancel_button.clicked.connect(self.cancel_changes)
-        button_layout.addWidget(self.cancel_button)
-
-        self.save_button = QPushButton('Сохранить')
-        self.save_button.clicked.connect(self.save_changes)
-        button_layout.addWidget(self.save_button)
-
-        layout.addLayout(button_layout)
-
-        container = QWidget()
-        container.setLayout(layout)
-        self.setCentralWidget(container)
-
-        self.update_table()
-        self.changes = []  # Для отслеживания изменений
-
-    def connect_db(self):
-        return psycopg2.connect(
-            dbname='Warehouses',
-            user='shava',
-            password='XsMyVs1420!?',
-            host='127.0.0.1',
-            port='5432'
-        )
+    def get_update_query(self):
+        raise NotImplementedError
     
-    def update_table(self):
-        try:
-            connection = self.connect_db()
-            cursor = connection.cursor()
-            cursor.execute("""
-                SELECT id, name, address, geo_text, geo_coordinates
-                FROM Clients 
-            """)
-            clients = cursor.fetchall()
-            connection.close()
+class ClientWindow(BaseWindow):
+    def __init__(self):
+        super().__init__('Клиенты', ['ID', 'Имя', 'Заказы', 'Инфо', 'Номер телефона', 'Адрес'])
 
-            self.table_widget.setRowCount(len(clients))
-            self.table_widget.setColumnCount(6)
-            self.table_widget.setHorizontalHeaderLabels(['ID', 'Имя', 'Адрес', 'Геолокация',
-                                                          'Координаты'])
-            for i, client in enumerate(clients):
-                self.table_widget.setItem(i, 0, QTableWidgetItem(str(client[0])))
-                self.table_widget.setItem(i, 1, QTableWidgetItem(client[1]))
-                self.table_widget.setItem(i, 2, QTableWidgetItem(client[2]))
-                self.table_widget.setItem(i, 3, QTableWidgetItem(client[3]))
-                self.table_widget.setItem(i, 4, QTableWidgetItem(client[4]))
-        except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', f'Ошибка при загрузке данных: {e}')
+    def get_select_query(self):
+        return """
+            SELECT id, name, orders, info, phonenumber, address
+            FROM Clients
+        """
 
-    def add_warehouse(self):
-        row_position = self.table_widget.rowCount()
-        self.table_widget.insertRow(row_position)
-        self.table_widget.setItem(row_position, 0, QTableWidgetItem(''))  # ID будет автоматически присваиваться
-        self.table_widget.setItem(row_position, 1, QTableWidgetItem('Новое имя'))
-        self.table_widget.setItem(row_position, 2, QTableWidgetItem('Новый адрес'))
-        self.table_widget.setItem(row_position, 3, QTableWidgetItem('Новая геолокация'))
-        self.table_widget.setItem(row_position, 4, QTableWidgetItem('Новые координаты'))
+    def get_insert_query(self):
+        return """
+            INSERT INTO Clients (name, orders, info, phonenumber, address)
+            VALUES (%s, %s, %s, %s, %s)
+        """
 
-        self.changes.append(('insert', None, [
-            'Новое имя', 'Новый адрес', 'Новая геолокация', 'Новые координаты'
-        ]))
-        QMessageBox.information(self, 'Успех', 'Склад успешно добавлен!')
+    def get_delete_query(self):
+        return "DELETE FROM Clients WHERE id = %s"
 
-    def delete_warehouse(self):
-        selected_row = self.table_widget.currentRow()
-        if selected_row >= 0:
-            id_item = self.table_widget.item(selected_row, 0)
-            if id_item:
-                self.changes.append(('delete', id_item.text(), None))
-            self.table_widget.removeRow(selected_row)
-            QMessageBox.information(self, 'Успех', 'Склад успешно удалён!')
+    def get_update_query(self):
+        return """
+            UPDATE Clients SET name = %s, orders = %s, info = %s, phonenumber = %s, address = %s
+            WHERE id = %s
+        """
 
-    def cancel_changes(self):
-        self.update_table()
-        self.changes.clear()
-        QMessageBox.information(self, 'Успех', 'Изменения успешно откатаны')
 
-    def save_changes(self):
-        try:
-            connection = self.connect_db()
-            cursor = connection.cursor()
-            connection.autocommit = False
+class WarehouseWindow(BaseWindow):
+    def __init__(self):
+        super().__init__('Склады', ['ID', 'Название', 'Адрес', 'Геолокация', 'Координаты'])
 
-            for change in self.changes:
-                change_type, row_id, row_data = change
-                if change_type == 'insert':
-                    cursor.execute(
-                        """
-                        INSERT INTO Warehouses (name, address, geo_text, geo_coordinates)
-                        VALUES (%s, %s, %s, %s)
-                        """,
-                        (row_data[0], row_data[1], row_data[2], row_data[3])
-                    )
-                elif change_type == 'delete':
-                    cursor.execute(
-                        "DELETE FROM Warehouses WHERE id = %s",
-                        (row_id,)
-                    )
-                elif change_type == 'update':
-                    cursor.execute(
-                        """
-                        UPDATE Warehouses SET name = %s, address = %s, geo_text = %s, geo_coordinates = %s, 
-                        WHERE id = %s
-                        """,
-                        (row_data[0], row_data[1], row_data[2], row_data[3], row_id)
-                    )
+    def get_select_query(self):
+        return """
+            SELECT id, name, address, geo_text, geo_coordinates
+            FROM Warehouses
+        """
 
-            connection.commit()
-            connection.close()
-            self.changes.clear()
-            QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
-        except Exception as e:
-            if connection:
-                connection.rollback()
-            QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при сохранении: {e}')
+    def get_insert_query(self):
+        return """
+            INSERT INTO Warehouses (name, address, geo_text, geo_coordinates)
+            VALUES (%s, %s, %s, %s)
+        """
 
-    def edit_cell(self, row, column):
-        old_item = self.table_widget.item(row, column)
-        if old_item:
-            old_value = old_item.text()
-            new_value = self.table_widget.currentItem().text()
+    def get_delete_query(self):
+        return "DELETE FROM Warehouses WHERE id = %s"
 
-            if old_value != new_value:
-                row_id_item = self.table_widget.item(row, 0)
-                if row_id_item:
-                    row_id = row_id_item.text()
-                    warehouse_data = [
-                        self.table_widget.item(row, 1).text(),
-                        self.table_widget.item(row, 2).text(),
-                        self.table_widget.item(row, 3).text(),
-                        self.table_widget.item(row, 4).text(),
-                    ]
-                    self.changes.append(('update', row_id, warehouse_data))
+    def get_update_query(self):
+        return """
+            UPDATE Warehouses SET name = %s, address = %s, geo_text = %s, geo_coordinates = %s
+            WHERE id = %s
+        """
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
