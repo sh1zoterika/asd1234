@@ -148,17 +148,17 @@ class BaseProductWindow(QMainWindow):
         self.query = query
         self.headers = headers
 
-        self.db = Database()  # Инициализация атрибута db
+        self.db = Database()  
 
         layout = QVBoxLayout()
 
-        # ComboBox for selecting warehouse
+        # Combo_box для складов
         self.combo_box = QComboBox()
         self.load_warehouses()
         self.combo_box.currentIndexChanged.connect(self.update_warehouse_table)
         layout.addWidget(self.combo_box)
 
-        # Horizontal layout for the two tables
+        # Горизонтальный слой для двух таблиц
         tables_layout = QHBoxLayout()
 
         # Table for displaying products from the selected warehouse
@@ -181,23 +181,9 @@ class BaseProductWindow(QMainWindow):
 
         self.update_warehouse_table()
 
-    def connect_db(self):
-        return psycopg2.connect(
-            dbname='Warehouses',
-            user='shava',
-            password='XsMyVs1420!?',
-            host='127.0.0.1',
-            port='5432'
-        )
-
     def load_warehouses(self):
         try:
-            connection = self.connect_db()
-            cursor = connection.cursor()
-            cursor.execute("SELECT id, name FROM Warehouses")
-            warehouses = cursor.fetchall()
-            connection.close()
-
+            warehouses = self.db.get_warehouses()
             for warehouse in warehouses:
                 self.combo_box.addItem(warehouse[1], warehouse[0])
         except Exception as e:
@@ -208,11 +194,9 @@ class BaseProductWindow(QMainWindow):
         warehouse_id = self.combo_box.currentData()
         if warehouse_id is not None:
             try:
-                connection = self.connect_db()
-                cursor = connection.cursor()
-                cursor.execute(self.query['select'], (warehouse_id,))
-                products = cursor.fetchall()
-                connection.close()
+                with self.db as db:
+                    db.cursor.execute(self.query['select'], (warehouse_id,))
+                    products = db.cursor.fetchall()
 
                 self.warehouse_table.setRowCount(len(products))
                 self.order_table.setRowCount(len(products))
@@ -545,26 +529,15 @@ class CurrentOrderWindow(QMainWindow):
         self.update_table()
         self.changes = []  # To track changes
 
-    def connect_db(self):
-        return psycopg2.connect(
-            dbname="Warehouses",
-            user="shava",
-            password="XsMyVs1420!?",
-            host="127.0.0.1",
-            port="5432"
-        )
-
     def update_table(self):
         try:
-            connection = self.connect_db()
-            cursor = connection.cursor()
-            cursor.execute("""
-                SELECT Orders.id, Clients.name 
-                FROM Orders
-                JOIN Clients ON Orders.client_id = Clients.id
-            """)
-            orders = cursor.fetchall()
-            connection.close()
+            with Database() as db:
+                db.cursor.execute("""
+                    SELECT Orders.id, Clients.name 
+                    FROM Orders
+                    JOIN Clients ON Orders.client_id = Clients.id
+                """)
+                orders = db.cursor.fetchall()
 
             self.table_widget.setRowCount(len(orders))
             self.table_widget.setColumnCount(2)
@@ -604,35 +577,31 @@ class CurrentOrderWindow(QMainWindow):
 
     def save_changes(self):
         try:
-            connection = self.connect_db()
-            cursor = connection.cursor()
-            connection.autocommit = False
+            with Database() as db:
+                for change in self.changes:
+                    change_type, row_id, row_data = change
+                    if change_type == 'insert':
+                        db.cursor.execute(
+                            "INSERT INTO Orders (client_name) VALUES (%s)",
+                            (row_data[0],)
+                        )
+                    elif change_type == 'delete':
+                        db.cursor.execute(
+                            "DELETE FROM Orders WHERE id = %s",
+                            (row_id,)
+                        )
+                    elif change_type == 'update':
+                        db.cursor.execute(
+                            "UPDATE Orders SET client_name = %s WHERE id = %s",
+                            (row_data[0], row_id)
+                        )
 
-            for change in self.changes:
-                change_type, row_id, row_data = change
-                if change_type == 'insert':
-                    cursor.execute(
-                        "INSERT INTO Orders (client_name) VALUES (%s)",
-                        (row_data[0],)
-                    )
-                elif change_type == 'delete':
-                    cursor.execute(
-                        "DELETE FROM Orders WHERE id = %s",
-                        (row_id,)
-                    )
-                elif change_type == 'update':
-                    cursor.execute(
-                        "UPDATE Orders SET client_name = %s WHERE id = %s",
-                        (row_data[0], row_id)
-                    )
-
-            connection.commit()
-            connection.close()
-            self.changes.clear()
-            QMessageBox.information(self, "Успех", "Изменения успешно сохранены!")
+                db.conn.commit()
+                self.changes.clear()
+                QMessageBox.information(self, "Успех", "Изменения успешно сохранены!")
         except Exception as e:
-            if connection:
-                connection.rollback()
+            if db.conn:
+                db.conn.rollback()
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
 
     def edit_cell(self, row, column):
@@ -750,40 +719,30 @@ class TransferWindow(QMainWindow):
 
     def save_changes(self):
         try:
-            connection = psycopg2.connect(
-                dbname="Warehouses",
-                user="shava",
-                password="XsMyVs1420!?",
-                host="127.0.0.1",
-                port="5432"
-            )
-            cursor = connection.cursor()
-            connection.autocommit = False
+            with Database() as db:
+                for change in self.changes:
+                    change_type, from_warehouse, to_warehouse, product_name, quantity = change
+                    if change_type == 'move':
+                        # Move product from one warehouse to another
+                        db.cursor.execute("""
+                            UPDATE ProductInWarehouse
+                            SET amount = amount - %s
+                            WHERE warehouse_id = %s AND product_name = %s
+                        """, (quantity, from_warehouse, product_name))
 
-            for change in self.changes:
-                change_type, from_warehouse, to_warehouse, product_name, quantity = change
-                if change_type == 'move':
-                    # Move product from one warehouse to another
-                    cursor.execute("""
-                        UPDATE ProductInWarehouse
-                        SET amount = amount - %s
-                        WHERE warehouse_id = %s AND product_name = %s
-                    """, (quantity, from_warehouse, product_name))
+                        db.cursor.execute("""
+                            INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price)
+                            VALUES (%s, %s, %s, (SELECT price FROM ProductInWarehouse WHERE warehouse_id = %s AND product_name = %s))
+                            ON CONFLICT (warehouse_id, product_name)
+                            DO UPDATE SET amount = ProductInWarehouse.amount + EXCLUDED.amount
+                        """, (to_warehouse, product_name, quantity, from_warehouse, product_name))
 
-                    cursor.execute("""
-                        INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price)
-                        VALUES (%s, %s, %s, (SELECT price FROM ProductInWarehouse WHERE warehouse_id = %s AND product_name = %s))
-                        ON CONFLICT (warehouse_id, product_name)
-                        DO UPDATE SET amount = ProductInWarehouse.amount + EXCLUDED.amount
-                    """, (to_warehouse, product_name, quantity, from_warehouse, product_name))
-
-            connection.commit()
-            connection.close()
-            self.changes.clear()
-            QMessageBox.information(self, "Успех", "Изменения успешно сохранены!")
+                db.conn.commit()
+                self.changes.clear()
+                QMessageBox.information(self, "Успех", "Изменения успешно сохранены!")
         except Exception as e:
-            if connection:
-                connection.rollback()
+            if db.conn:
+                db.conn.rollback()
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
 
 class BaseWindow(QMainWindow):
@@ -825,32 +784,19 @@ class BaseWindow(QMainWindow):
         self.update_table()
         self.changes = []  # Для отслеживания изменений
 
-    def connect_db(self):
-        return psycopg2.connect(
-            dbname='Warehouses',
-            user='shava',
-            password='XsMyVs1420!?',
-            host='127.0.0.1',
-            port='5432'
-        )
-
     def update_table(self):
-        connection = self.connect_db()
-        if connection:
-            try:
-                cursor = connection.cursor()
-                cursor.execute(self.get_select_query())
-                items = cursor.fetchall()
+        try:
+            with Database() as db:
+                db.cursor.execute(self.get_select_query())
+                items = db.cursor.fetchall()
                 self.table_widget.setRowCount(len(items))
                 self.table_widget.setColumnCount(len(self.table_headers))
                 self.table_widget.setHorizontalHeaderLabels(self.table_headers)
                 for i, item in enumerate(items):
                     for j, value in enumerate(item):
                         self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
-            except Exception as e:
-                QMessageBox.critical(self, 'Ошибка', f'Ошибка при загрузке данных: {e}')
-            finally:
-                connection.close()
+        except Exception as e:
+            QMessageBox.critical(self, 'Ошибка', f'Ошибка при загрузке данных: {e}')
 
     def add_item(self):
         row_position = self.table_widget.rowCount()
@@ -876,26 +822,22 @@ class BaseWindow(QMainWindow):
 
     def save_changes(self):
         try:
-            connection = self.connect_db()
-            cursor = connection.cursor()
-            connection.autocommit = False
+            with Database() as db:
+                for change in self.changes:
+                    change_type, row_id, row_data = change
+                    if change_type == 'insert':
+                        db.cursor.execute(self.get_insert_query(), row_data)
+                    elif change_type == 'delete':
+                        db.cursor.execute(self.get_delete_query(), (row_id,))
+                    elif change_type == 'update':
+                        db.cursor.execute(self.get_update_query(), row_data + [row_id])
 
-            for change in self.changes:
-                change_type, row_id, row_data = change
-                if change_type == 'insert':
-                    cursor.execute(self.get_insert_query(), row_data)
-                elif change_type == 'delete':
-                    cursor.execute(self.get_delete_query(), (row_id,))
-                elif change_type == 'update':
-                    cursor.execute(self.get_update_query(), row_data + [row_id])
-
-            connection.commit()
-            connection.close()
-            self.changes.clear()
-            QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
+                db.conn.commit()
+                self.changes.clear()
+                QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
         except Exception as e:
-            if connection:
-                connection.rollback()
+            if db.conn:
+                db.conn.rollback()
             QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при сохранении: {e}')
 
     def edit_cell(self, row, column):
@@ -921,7 +863,7 @@ class BaseWindow(QMainWindow):
         raise NotImplementedError
 
     def get_update_query(self):
-        raise NotImplementedError    
+        raise NotImplementedError
 
 class ReceivingWindow(BaseWindow):
     def __init__(self):
