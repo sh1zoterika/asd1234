@@ -10,7 +10,7 @@ from psycopg2 import OperationalError, sql
 from Database import Database
 
 class BaseProductWindow(QMainWindow):
-    def __init__(self, title, geometry, headers, query, parent=None, user=None, password=None):
+    def __init__(self, title, geometry, headers, query, user=None, password=None, parent=None):
         self.user = user
         self.password = password
         super().__init__(parent)
