@@ -18,7 +18,8 @@ class ReceivingWindow(BaseWindow):
         try:
             self.db = Database(self.user, self.password)
             self.combo_box = QComboBox()  # Initialize combo_box here
-            super().__init__('Приёмка товаров', ['Товар', 'Количество', 'Цена'], self.user, self.password)
+            column_names = self.db.get_column_names('productinwarehouse')
+            super().__init__('Приёмка товаров', column_names, self.user, self.password)
             self.changes = []  # Для отслеживания изменений
 
             self.load_warehouses()

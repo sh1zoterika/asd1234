@@ -96,3 +96,13 @@ class Database():
         except Exception as e:
             print(f"Ошибка при получении ID склада: {e}")
             return None
+
+    def get_column_names(self, tablename):
+        try:
+            with self as db:
+                db.cursor.execute(f"SELECT * FROM {tablename} LIMIT 0;")
+                column_names = [desc[0] for desc in db.cursor.description]
+                return column_names
+        except Exception as e:
+            print(f"Ошибка при получении имён столбцов: {e}")
+            return None

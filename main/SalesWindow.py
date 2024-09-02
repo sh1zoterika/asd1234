@@ -76,8 +76,9 @@ class SalesWindow(QMainWindow):
             order_id = self.orders_combo.currentData()
             products = self.db.get_products_by_order(order_id)
             self.table_widget.setRowCount(len(products))
-            self.table_widget.setColumnCount(3)
-            self.table_widget.setHorizontalHeaderLabels(["Product", "Amount", "Price"])
+            self.table_widget.setColumnCount(5)
+            column_names = self.db.get_column_names('orders')
+            self.table_widget.setHorizontalHeaderLabels(column_names)
             for i, (name, amount, price) in enumerate(products):
                 self.table_widget.setItem(i, 0, QTableWidgetItem(name))
                 self.table_widget.setItem(i, 1, QTableWidgetItem(str(amount)))

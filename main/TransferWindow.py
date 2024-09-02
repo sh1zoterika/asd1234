@@ -43,8 +43,9 @@ class TransferWindow(QMainWindow):
 
         # Table for products in the selected warehouse
         self.warehouse_table = QTableWidget()
-        self.warehouse_table.setColumnCount(3)
-        self.warehouse_table.setHorizontalHeaderLabels(['Товар', 'Количество', 'Цена'])
+        self.warehouse_table.setColumnCount(4)
+        column_names = self.db.get_column_names('productinwarehouse')
+        self.warehouse_table.setHorizontalHeaderLabels(column_names)
         main_layout.addWidget(self.warehouse_table)
 
         # Table for moving products

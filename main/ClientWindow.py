@@ -8,11 +8,14 @@ from PyQt5.QtWidgets import (
 )
 from psycopg2 import OperationalError, sql
 from BaseWindow import BaseWindow
+from Database import Database
 
 
 class ClientWindow(BaseWindow):
     def __init__(self, user, password):
-        super().__init__('Клиенты', ['ID', 'Имя', 'Заказы', 'Инфо', 'Номер телефона', 'Адрес'], user, password)
+        self.db = Database(user, password)
+        column_names = self.db.get_column_names('clients')
+        super().__init__('Клиенты', column_names, user, password)
 
         self.view_orders_button = QPushButton('Посмотреть заказы')
         self.view_orders_button.clicked.connect(self.view_orders)
