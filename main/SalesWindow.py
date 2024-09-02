@@ -97,7 +97,7 @@ class SalesWindow(QMainWindow):
     def open_add_product_window(self):
         try:
             order_id = self.orders_combo.currentData()
-            self.add_product_window = AddProductWindow(order_id, self.user, self.password, self)  # Укажите родительское окно
+            self.add_product_window = AddProductWindow(order_id, self.user, self.password, parent=self)  # Укажите родительское окно
             self.add_product_window.show()
         except Exception as e:
             QMessageBox.critical(self, 'Error', f'Error opening add product window: {e}')
