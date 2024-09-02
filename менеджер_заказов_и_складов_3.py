@@ -52,7 +52,7 @@ class LoginWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to open Main Window: {e}")
 
-class Database():
+class Database():     #вынесен
     def __init__(self):
         self.dbname = 'Warehouses'
         self.user = GlobalData.username
