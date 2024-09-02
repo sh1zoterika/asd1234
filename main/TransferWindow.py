@@ -12,12 +12,12 @@ from Database import Database
 
 
 class TransferWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, user, password):
         super().__init__()
         self.setWindowTitle('Перемещение товаров')
         self.setGeometry(600, 200, 800, 600)
 
-        self.db = Database()
+        self.db = Database(user, password)
         self.changes = []  # For tracking changes
 
         layout = QVBoxLayout()

@@ -12,13 +12,13 @@ from BaseProductWindow import BaseProductWindow
 
 
 class WriteOffProductWindow(BaseProductWindow):
-    def __init__(self):
+    def __init__(self, user, password):
         query = {
             'select': """SELECT product_name, amount, price FROM ProductInWarehouse WHERE warehouse_id = %s""",
             'insert': """UPDATE ProductInWarehouse SET amount = amount - %s WHERE warehouse_id = %s AND product_name = %s AND amount >= %s"""
         }
         headers = ['Товар', 'Количество в наличии', 'Цена', 'Количество списания']
-        super().__init__('Списание товаров', (600, 200, 1000, 600), headers, query)
+        super().__init__('Списание товаров', (600, 200, 1000, 600), headers, query, user, password)
 
         # Create and configure buttons
         self.writeoff_button = QPushButton('Списать товары')

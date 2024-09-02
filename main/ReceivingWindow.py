@@ -12,11 +12,13 @@ from BaseWindow import BaseWindow
 
 
 class ReceivingWindow(BaseWindow):
-    def __init__(self):
+    def __init__(self, user, password):
+        self.user = user
+        self.password = password
         try:
-            self.db = Database()
+            self.db = Database(self.user, self.password)
             self.combo_box = QComboBox()  # Initialize combo_box here
-            super().__init__('Приёмка товаров', ['Товар', 'Количество', 'Цена'])
+            super().__init__('Приёмка товаров', ['Товар', 'Количество', 'Цена'], self.user, self.password)
             self.changes = []  # Для отслеживания изменений
 
             self.load_warehouses()

@@ -11,8 +11,8 @@ from BaseWindow import BaseWindow
 
 
 class ClientWindow(BaseWindow):
-    def __init__(self):
-        super().__init__('Клиенты', ['ID', 'Имя', 'Заказы', 'Инфо', 'Номер телефона', 'Адрес'])
+    def __init__(self, user, password):
+        super().__init__('Клиенты', ['ID', 'Имя', 'Заказы', 'Инфо', 'Номер телефона', 'Адрес'], user, password)
 
         self.view_orders_button = QPushButton('Посмотреть заказы')
         self.view_orders_button.clicked.connect(self.view_orders)

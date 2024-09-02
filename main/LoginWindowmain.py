@@ -45,11 +45,13 @@ class LoginWindow(QMainWindow):
 
 
     def open_main_window(self):
-        GlobalData.username = self.username_input.text()
-        GlobalData.password = self.password_input.text()
+        user = self.username_input.text()
+        password = self.password_input.text()
+        GlobalData.username = user
+        GlobalData.password = password
         try:
             from MainWindow import MainWindow
-            self.main_window = MainWindow()
+            self.main_window = MainWindow(user, password)
             self.main_window.show()
             self.close()
         except Exception as e:

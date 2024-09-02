@@ -11,10 +11,10 @@ from LoginWindowmain import GlobalData
 
 
 class Database():
-    def __init__(self):
+    def __init__(self, user, password):
         self.dbname = 'Warehouses'
-        self.user = GlobalData.username
-        self.password = GlobalData.password
+        self.user = user
+        self.password = password
         self.host = "127.0.0.1"
         self.port = "5432"
         self.conn = None

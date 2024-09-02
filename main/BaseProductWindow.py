@@ -10,7 +10,9 @@ from psycopg2 import OperationalError, sql
 from Database import Database
 
 class BaseProductWindow(QMainWindow):
-    def __init__(self, title, geometry, headers, query, parent=None):
+    def __init__(self, title, geometry, headers, query, parent=None, user=None, password=None):
+        self.user = user
+        self.password = password
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setGeometry(*geometry)
@@ -18,7 +20,7 @@ class BaseProductWindow(QMainWindow):
         self.query = query
         self.headers = headers
 
-        self.db = Database()
+        self.db = Database(self.user, self.password)
 
         layout = QVBoxLayout()
 
@@ -79,10 +81,10 @@ class BaseProductWindow(QMainWindow):
                 print(f"Error updating warehouse table: {e}")
                 QMessageBox.critical(self, "Ошибка", f"Ошибка обновления таблицы склада: {e}")
 
-    def closeEvent(self, event):
-        print(f"Closing {self.windowTitle()}...")
-        try:
-            self.db.close()
-        except Exception as e:
-            print(f"Error closing database connection: {e}")
-        event.accept()
+    #def closeEvent(self, event):      ************
+        #print(f"Closing {self.windowTitle()}...")
+        #try:
+        #    self.db.close()
+        #except Exception as e:
+            #print(f"Error closing database connection: {e}")
+        #event.accept()

@@ -13,8 +13,8 @@ from BaseWindow import BaseWindow
 
 
 class WarehouseWindow(BaseWindow):
-    def __init__(self):
-        super().__init__('Склады', ['ID', 'Название', 'Адрес', 'Геолокация', 'Координаты'])
+    def __init__(self, user, password):
+        super().__init__('Склады', ['ID', 'Название', 'Адрес', 'Геолокация', 'Координаты'], user, password)
 
         self.view_products_button = QPushButton('Посмотреть товары на выбранном складе')
         self.view_products_button.clicked.connect(self.view_products)

@@ -12,8 +12,10 @@ from Database import Database
 
 
 class BaseWindow(QMainWindow):
-    def __init__(self, title, table_headers):
+    def __init__(self, title, table_headers, user, password):
         super().__init__()
+        self.user = user
+        self.password = password
         self.setWindowTitle(title)
         self.setGeometry(600, 200, 800, 600)
 
@@ -52,7 +54,7 @@ class BaseWindow(QMainWindow):
 
     def update_table(self):
         try:
-            with Database() as db:
+            with Database(self.user, self.password) as db:
                 db.cursor.execute(self.get_select_query())
                 items = db.cursor.fetchall()
                 self.table_widget.setRowCount(len(items))
@@ -88,7 +90,7 @@ class BaseWindow(QMainWindow):
 
     def save_changes(self):
         try:
-            with Database() as db:
+            with Database(self.user, self.password) as db:
                 for change in self.changes:
                     change_type, row_id, row_data = change
                     if change_type == 'insert':

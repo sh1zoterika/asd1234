@@ -11,7 +11,9 @@ from Database import Database
 
 
 class CurrentOrderWindow(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, user=None, password=None):
+        self.user = user
+        self.password = password
         super().__init__(parent)
         self.setWindowTitle('Текущие заказы')
         self.setGeometry(600, 200, 800, 600)
@@ -50,7 +52,7 @@ class CurrentOrderWindow(QMainWindow):
 
     def update_table(self):
         try:
-            with Database() as db:
+            with Database(self.user, self.password) as db:
                 db.cursor.execute("""
                     SELECT Orders.id, Clients.name 
                     FROM Orders
@@ -96,7 +98,7 @@ class CurrentOrderWindow(QMainWindow):
 
     def save_changes(self):
         try:
-            with Database() as db:
+            with Database(self.user, self.password) as db:
                 for change in self.changes:
                     change_type, row_id, row_data = change
                     if change_type == 'insert':

@@ -12,13 +12,15 @@ from BaseProductWindow import BaseProductWindow
 
 
 class AddProductWindow(BaseProductWindow):
-    def __init__(self, order_id, parent=None):
+    def __init__(self, order_id, user, password, parent=None):
+        self.user = user
+        self.password = password
         query = {
             'select': """SELECT product_name, amount, price FROM ProductInWarehouse WHERE warehouse_id = %s""",
             'insert': """INSERT INTO Order_items (order_id, product_name, quantity, price) VALUES (%s, %s, %s, %s)"""
         }
         headers = ['Товар', 'Количество', 'Цена', 'Количество в заказ']
-        super().__init__('Добавить товары в заказ', (600, 200, 1000, 600), headers, query, parent)
+        super().__init__('Добавить товары в заказ', (600, 200, 1000, 600), headers, query, parent, self.user, self.password)
         self.order_id = order_id
 
         # Button to add products to the order

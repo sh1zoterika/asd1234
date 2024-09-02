@@ -13,12 +13,14 @@ from AddProductWindow import AddProductWindow
 
 
 class SalesWindow(QMainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, user=None, password=None, parent=None):
+        self.user = user
+        self.password = password
         super().__init__(parent)
         self.setWindowTitle("Продажа товаров")
         self.setGeometry(600, 200, 800, 600)
 
-        self.db = Database()
+        self.db = Database(self.user, self.password)
 
         layout = QVBoxLayout()
 
@@ -86,7 +88,7 @@ class SalesWindow(QMainWindow):
 
     def open_current_orders_window(self):
         try:
-            self.current_orders_window = CurrentOrderWindow(self)  # Укажите родительское окно
+            self.current_orders_window = CurrentOrderWindow(self, self.user, self.password)  # Укажите родительское окно
             self.current_orders_window.show()
         except Exception as e:
             QMessageBox.critical(self, 'Error', f'Error opening current orders window: {e}')
@@ -94,7 +96,7 @@ class SalesWindow(QMainWindow):
     def open_add_product_window(self):
         try:
             order_id = self.orders_combo.currentData()
-            self.add_product_window = AddProductWindow(order_id, self)  # Укажите родительское окно
+            self.add_product_window = AddProductWindow(order_id, self.user, self.password, self)  # Укажите родительское окно
             self.add_product_window.show()
         except Exception as e:
             QMessageBox.critical(self, 'Error', f'Error opening add product window: {e}')
