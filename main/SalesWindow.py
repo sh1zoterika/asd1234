@@ -20,7 +20,6 @@ class SalesWindow(QMainWindow):
         self.setWindowTitle("Продажа товаров")
         self.setGeometry(600, 200, 800, 600)
 
-        self.db = Database(self.user, self.password)
 
         layout = QVBoxLayout()
 
@@ -63,26 +62,28 @@ class SalesWindow(QMainWindow):
 
     def load_orders(self):
         try:
-            orders = self.db.get_orders()
-            self.orders_combo.clear()  # Очистить старые элементы
-            for order in orders:
-                self.orders_combo.addItem(f"Order {order[0]} - {order[1]}", order[0])
+            with Database(self.user, self.password) as db:
+                orders = db.get_orders()
+                self.orders_combo.clear()  # Очистить старые элементы
+                for order in orders:
+                    self.orders_combo.addItem(f"Order {order[0]} - {order[1]}", order[0])
         except Exception as e:
             print(f"Error loading orders: {e}")
             QMessageBox.critical(self, "Error", f"Error loading orders: {e}")
 
     def update_table(self):
         try:
-            order_id = self.orders_combo.currentData()
-            products = self.db.get_products_by_order(order_id)
-            self.table_widget.setRowCount(len(products))
-            self.table_widget.setColumnCount(5)
-            column_names = self.db.get_column_names('orders')
-            self.table_widget.setHorizontalHeaderLabels(column_names)
-            for i, (name, amount, price) in enumerate(products):
-                self.table_widget.setItem(i, 0, QTableWidgetItem(name))
-                self.table_widget.setItem(i, 1, QTableWidgetItem(str(amount)))
-                self.table_widget.setItem(i, 2, QTableWidgetItem(str(price)))
+            with Database(self.user, self.password) as db:
+                order_id = self.orders_combo.currentData()
+                products = db.get_products_by_order(order_id)
+                self.table_widget.setRowCount(len(products))
+                self.table_widget.setColumnCount(5)
+                column_names = db.get_column_names('orders')
+                self.table_widget.setHorizontalHeaderLabels(column_names)
+                for i, (name, amount, price) in enumerate(products):
+                    self.table_widget.setItem(i, 0, QTableWidgetItem(name))
+                    self.table_widget.setItem(i, 1, QTableWidgetItem(str(amount)))
+                    self.table_widget.setItem(i, 2, QTableWidgetItem(str(price)))
         except Exception as e:
             print(f"Error updating table: {e}")
             QMessageBox.critical(self, "Error", f"Error updating table: {e}")

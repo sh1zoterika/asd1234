@@ -124,7 +124,7 @@ class BaseWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при сохранении: {e}')
 
-    '''def edit_cell(self, row, column):
+    '''def edit_cell(self, row, column):         Заменено на changer
         old_item = self.table_widget.item(row, column)
         if old_item:
             old_value = old_item.text()

@@ -13,11 +13,12 @@ from Database import Database
 
 class TransferWindow(QMainWindow):
     def __init__(self, user, password):
+        self.user = user
+        self.password = password
         super().__init__()
         self.setWindowTitle('Перемещение товаров')
         self.setGeometry(600, 200, 800, 600)
 
-        self.db = Database(user, password)
         self.changes = []  # For tracking changes
 
         layout = QVBoxLayout()
@@ -44,7 +45,8 @@ class TransferWindow(QMainWindow):
         # Table for products in the selected warehouse
         self.warehouse_table = QTableWidget()
         self.warehouse_table.setColumnCount(4)
-        column_names = self.db.get_column_names('productinwarehouse')
+        with Database(self.user, self.password) as db:
+            column_names = db.get_column_names('productinwarehouse')
         self.warehouse_table.setHorizontalHeaderLabels(column_names)
         main_layout.addWidget(self.warehouse_table)
 
@@ -81,38 +83,40 @@ class TransferWindow(QMainWindow):
         self.update_table()
 
     def load_warehouses(self, combo_box):
-        warehouses = self.db.get_warehouses()
-        for warehouse in warehouses:
-            combo_box.addItem(warehouse[1], warehouse[0])
+        with Database(self.user, self.password) as db:
+            warehouses = db.get_warehouses()
+            for warehouse in warehouses:
+                combo_box.addItem(warehouse[1], warehouse[0])
 
     def update_table(self):
-        from_warehouse_id = self.from_warehouse_combo_box.currentData()
-        if from_warehouse_id is not None:
-            products = self.db.get_products_by_warehouse(from_warehouse_id)
-            self.warehouse_table.setRowCount(len(products))
-            self.move_table.setRowCount(len(products))
-            for i, product in enumerate(products):
-                self.warehouse_table.setItem(i, 0, QTableWidgetItem(product[0]))
-                self.warehouse_table.setItem(i, 1, QTableWidgetItem(str(product[1])))
-                self.warehouse_table.setItem(i, 2, QTableWidgetItem(str(product[2])))
+        with Database(self.user, self.password) as db:
+            from_warehouse_id = self.from_warehouse_combo_box.currentData()
+            if from_warehouse_id is not None:
+                products = db.get_products_by_warehouse(from_warehouse_id)
+                self.warehouse_table.setRowCount(len(products))
+                self.move_table.setRowCount(len(products))
+                for i, product in enumerate(products):
+                    self.warehouse_table.setItem(i, 0, QTableWidgetItem(product[0]))
+                    self.warehouse_table.setItem(i, 1, QTableWidgetItem(str(product[1])))
+                    self.warehouse_table.setItem(i, 2, QTableWidgetItem(str(product[2])))
 
-                # Initialize move_table
-                self.move_table.setItem(i, 0, QTableWidgetItem('0'))
-                self.move_table.setItem(i, 1, QTableWidgetItem(self.from_warehouse_combo_box.currentText()))
+                    # Initialize move_table
+                    self.move_table.setItem(i, 0, QTableWidgetItem('0'))
+                    self.move_table.setItem(i, 1, QTableWidgetItem(self.from_warehouse_combo_box.currentText()))
 
     def move_products(self):
-        from_warehouse_id = self.from_warehouse_combo_box.currentData()
+        with Database(self.user, self.password) as db:
+            from_warehouse_id = self.from_warehouse_combo_box.currentData()
+            if from_warehouse_id:
+                for i in range(self.move_table.rowCount()):
+                    quantity = self.move_table.item(i, 0).text()
+                    to_warehouse_name = self.move_table.item(i, 1).text()
+                    product_name = self.warehouse_table.item(i, 0).text()
 
-        if from_warehouse_id:
-            for i in range(self.move_table.rowCount()):
-                quantity = self.move_table.item(i, 0).text()
-                to_warehouse_name = self.move_table.item(i, 1).text()
-                product_name = self.warehouse_table.item(i, 0).text()
-
-                if quantity and to_warehouse_name:
-                    to_warehouse_id = self.db.get_warehouse_id_by_name(to_warehouse_name)
-                    if to_warehouse_id:
-                        self.changes.append(('move', from_warehouse_id, to_warehouse_id, product_name, quantity))
+                    if quantity and to_warehouse_name:
+                        to_warehouse_id = db.get_warehouse_id_by_name(to_warehouse_name)
+                        if to_warehouse_id:
+                            self.changes.append(('move', from_warehouse_id, to_warehouse_id, product_name, quantity))
 
             QMessageBox.information(self, 'Успех', 'Товары перемещены!')
 
@@ -123,7 +127,7 @@ class TransferWindow(QMainWindow):
 
     def save_changes(self):
         try:
-            with Database() as db:
+            with Database(self.user, self.password) as db:
                 for change in self.changes:
                     change_type, from_warehouse, to_warehouse, product_name, quantity = change
                     if change_type == 'move':

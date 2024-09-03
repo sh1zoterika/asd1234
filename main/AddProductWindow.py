@@ -33,19 +33,20 @@ class AddProductWindow(BaseProductWindow):
         warehouse_id = self.combo_box.currentData()
         if warehouse_id:
             try:
-                connection = self.connect_db()
-                cursor = connection.cursor()
-                connection.autocommit = False
+                with Database(self.user, self.password) as db:
+                #connection = self.connect_db()
+                #cursor = connection.cursor()
+                #connection.autocommit = False
 
-                for i in range(self.warehouse_table.rowCount()):
-                    product_name = self.warehouse_table.item(i, 0).text()
-                    quantity = int(self.order_table.item(i, 0).text())
-                    price = float(self.warehouse_table.item(i, 2).text())
-                    if quantity > 0:
-                        cursor.execute(self.query['insert'], (self.order_id, product_name, quantity, price))
+                    for i in range(self.warehouse_table.rowCount()):
+                        product_name = self.warehouse_table.item(i, 0).text()
+                        quantity = int(self.order_table.item(i, 0).text())
+                        price = float(self.warehouse_table.item(i, 2).text())
+                        if quantity > 0:
+                            db.cursor.execute(self.query['insert'], (self.order_id, product_name, quantity, price))
 
-                connection.commit()
-                connection.close()
+                #connection.commit()
+                #connection.close()
                 QMessageBox.information(self, 'Успех', 'Товары добавлены в заказ.')
             except Exception as e:
                 if connection:
