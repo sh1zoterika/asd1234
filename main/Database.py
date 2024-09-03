@@ -106,3 +106,15 @@ class Database():
         except Exception as e:
             print(f"Ошибка при получении имён столбцов: {e}")
             return None
+
+    def get_product_in_warehouse(self, warehouseid):
+        try:
+            with self as db:
+                db.cursor.execute(f"""SELECT * FROM productinwarehouse
+                WHERE warehouse_id = {warehouseid}
+                """)
+                result = db.cursor.fetchall()
+                return result
+        except Exception as e:
+            print(f"Ошибка при товаров на складе: {e}")
+            return None

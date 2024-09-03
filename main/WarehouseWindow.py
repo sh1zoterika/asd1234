@@ -9,11 +9,13 @@ from PyQt5.QtWidgets import (
 from psycopg2 import OperationalError, sql
 from Database import Database
 from BaseWindow import BaseWindow
-
+from ViewProductWindow import ViewProductWindow
 
 
 class WarehouseWindow(BaseWindow):
     def __init__(self, user, password):
+        self.user = user
+        self.password = password
         self.db = Database(user, password)
         column_names = self.db.get_column_names('warehouses')
         super().__init__('Склады', column_names, user, password)
@@ -24,7 +26,21 @@ class WarehouseWindow(BaseWindow):
         layout.addWidget(self.view_products_button)
 
     def view_products(self):
-        pass
+        # Получаем текущие выбранные элементы
+        selected_items = self.table_widget.selectedItems()
+        if selected_items:
+            # Берем первую выбранную ячейку
+            first_item = selected_items[0]
+            # Получаем индекс строки этой ячейки
+            row = first_item.row()
+            # Получаем warehouseid из первой ячейки
+            row_data = [self.table_widget.item(row, col).text() for col in range(self.table_widget.columnCount())]
+            warehouseid = row_data[0]
+            viewproduct = ViewProductWindow(self.user, self.password, warehouseid)
+            viewproduct.show()
+
+        else:
+            print("No row selected")
 
     def get_select_query(self):
         return """
