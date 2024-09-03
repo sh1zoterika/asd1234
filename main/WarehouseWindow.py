@@ -18,7 +18,7 @@ class WarehouseWindow(BaseWindow):
         self.password = password
         self.db = Database(user, password)
         column_names = self.db.get_column_names('warehouses')
-        super().__init__('Склады', column_names, user, password)
+        super().__init__('Склады', column_names, user, password, 'warehouses')
 
         self.view_products_button = QPushButton('Посмотреть товары на выбранном складе')
         self.view_products_button.clicked.connect(self.view_products)
@@ -38,9 +38,8 @@ class WarehouseWindow(BaseWindow):
             warehouseid = row_data[0]
             viewproduct = ViewProductWindow(self.user, self.password, warehouseid)
             viewproduct.show()
-
         else:
-            print("No row selected")
+            QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите склад.')
 
     def get_select_query(self):
         return """

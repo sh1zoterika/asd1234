@@ -15,7 +15,7 @@ class ClientWindow(BaseWindow):
     def __init__(self, user, password):
         self.db = Database(user, password)
         column_names = self.db.get_column_names('clients')
-        super().__init__('Клиенты', column_names, user, password)
+        super().__init__('Клиенты', column_names, user, password, 'clients')
 
         self.view_orders_button = QPushButton('Посмотреть заказы')
         self.view_orders_button.clicked.connect(self.view_orders)

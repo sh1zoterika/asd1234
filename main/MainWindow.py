@@ -70,11 +70,11 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, 'Ошибка', f'Ошибка открытия окна с клиентами: {e}')
 
     def open_warehouses_window(self):
-        try:
-            self.warehouse_window = WarehouseWindow(self.user, self.password)
-            self.warehouse_window.show()
-        except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', f'Ошибка открытия окна со складами: {e}')
+        #try:
+        self.warehouse_window = WarehouseWindow(self.user, self.password)
+        self.warehouse_window.show()
+        #except Exception as e:
+            #QMessageBox.critical(self, 'Ошибка', f'Ошибка открытия окна со складами: {e}')
 
     def open_documents_window(self):
         pass
