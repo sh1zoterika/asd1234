@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit
 )
 from psycopg2 import OperationalError, sql
-import Database
+from Database import Database
 from BaseProductWindow import BaseProductWindow
 
 

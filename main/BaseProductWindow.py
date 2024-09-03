@@ -20,7 +20,7 @@ class BaseProductWindow(QMainWindow):
         self.query = query
         self.headers = headers
 
-        self.db = Database(self.user, self.password)
+
 
         layout = QVBoxLayout()
 
@@ -55,9 +55,10 @@ class BaseProductWindow(QMainWindow):
 
     def load_warehouses(self):
         try:
-            warehouses = self.db.get_warehouses()
-            for warehouse in warehouses:
-                self.combo_box.addItem(warehouse[1], warehouse[0])
+            with Database(self.user, self.password) as db:
+                warehouses = db.get_warehouses()
+                for warehouse in warehouses:
+                    self.combo_box.addItem(warehouse[1], warehouse[0])
         except Exception as e:
             print(f"Error loading warehouses: {e}")
             QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки складов: {e}")
