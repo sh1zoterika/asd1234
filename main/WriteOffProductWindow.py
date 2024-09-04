@@ -13,12 +13,18 @@ from BaseProductWindow import BaseProductWindow
 
 class WriteOffProductWindow(BaseProductWindow):
     def __init__(self, user, password):
-        query = {
-            'select': """SELECT product_name, amount, price FROM ProductInWarehouse WHERE warehouse_id = %s""",
-            'insert': """UPDATE ProductInWarehouse SET amount = amount - %s WHERE warehouse_id = %s AND product_name = %s AND amount >= %s"""
+        self.user = user
+        self.password = password
+        self.query = {
+            'select': """SELECT Products.name, ProductInWarehouse.product_id, ProductInWarehouse.amount
+        FROM ProductInWarehouse
+        JOIN Products ON Products.id = ProductInWarehouse.product_id
+        WHERE ProductInWarehouse.warehouse_id = %s;""",
+            'insert': """UPDATE ProductInWarehouse SET amount = amount - %s 
+            WHERE warehouse_id = %s AND product_id = %s AND amount >= %s"""
         }
         headers = ['Товар', 'Количество в наличии', 'Цена', 'Количество списания']
-        super().__init__('Списание товаров', (600, 200, 1000, 600), headers, query, user, password)
+        super().__init__('Списание товаров', (600, 200, 1000, 600), headers, self.query, user, password)
 
         # Create and configure buttons
         self.writeoff_button = QPushButton('Списать товары')
@@ -37,25 +43,21 @@ class WriteOffProductWindow(BaseProductWindow):
         layout.addWidget(self.save_button)
 
     def write_off_products(self):
-        warehouse_id = self.combo_box.currentData()
-        if warehouse_id:
+        self.warehouse_id = self.combo_box.currentData()
+        if self.warehouse_id:
             try:
-                connection = self.connect_db()
-                cursor = connection.cursor()
-                connection.autocommit = False
+                with Database(self.user, self.password) as db:
 
-                for i in range(self.warehouse_table.rowCount()):
-                    product_name = self.warehouse_table.item(i, 0).text()
-                    write_off_amount = int(self.order_table.item(i, 0).text())
-                    if write_off_amount > 0:
-                        cursor.execute(self.query['insert'], (write_off_amount, warehouse_id, product_name, write_off_amount))
-
-                connection.commit()
-                connection.close()
-                QMessageBox.information(self, 'Успех', 'Товары списаны со склада.')
+                    for i in range(self.warehouse_table.rowCount()):
+                        product_id = self.warehouse_table.item(i, 1).text()
+                        write_off_amount = int(self.order_table.item(i, 0).text())
+                        if write_off_amount > 0:
+                            db.cursor.execute(self.query['insert'], (write_off_amount, self.warehouse_id, product_id, write_off_amount))
+                    db.conn.commit()
+                    QMessageBox.information(self, 'Успех', 'Товары списаны со склада.')
             except Exception as e:
-                if connection:
-                    connection.rollback()
+                if db.conn:
+                    db.conn.rollback()
                 print(f"Error writing off products: {e}")
                 QMessageBox.critical(self, 'Ошибка', f'Ошибка списания товаров: {e}')
         else:
@@ -67,21 +69,17 @@ class WriteOffProductWindow(BaseProductWindow):
 
     def save_changes(self):
         try:
-            connection = self.connect_db()
-            cursor = connection.cursor()
-            connection.autocommit = False
+            with Database(self.user, self.password) as db:
+                for i in range(self.warehouse_table.rowCount()):
+                    product_name = self.warehouse_table.item(i, 0).text()
+                    write_off_amount = int(self.order_table.item(i, 0).text())
+                    if write_off_amount > 0:
+                        db.cursor.execute(self.query['insert'], (write_off_amount, self.warehouse_id, product_name, write_off_amount))
 
-            for i in range(self.warehouse_table.rowCount()):
-                product_name = self.warehouse_table.item(i, 0).text()
-                write_off_amount = int(self.order_table.item(i, 0).text())
-                if write_off_amount > 0:
-                    cursor.execute(self.query['insert'], (write_off_amount, warehouse_id, product_name, write_off_amount))
-
-            connection.commit()
-            connection.close()
+                db.conn.commit()
             QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
         except Exception as e:
-            if connection:
-                connection.rollback()
+            if db.conn:
+                db.conn.rollback()
             print(f"Error saving changes: {e}")
             QMessageBox.critical(self, 'Ошибка', f'Ошибка сохранения изменений: {e}')

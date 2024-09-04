@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 from psycopg2 import OperationalError, sql
 from Database import Database
 
+
 class BaseProductWindow(QMainWindow):
     def __init__(self, title, geometry, headers, query, user=None, password=None, parent=None):
         self.user = user
@@ -19,8 +20,6 @@ class BaseProductWindow(QMainWindow):
 
         self.query = query
         self.headers = headers
-
-
 
         layout = QVBoxLayout()
 
@@ -83,9 +82,9 @@ class BaseProductWindow(QMainWindow):
                 QMessageBox.critical(self, "Ошибка", f"Ошибка обновления таблицы склада: {e}")
 
     #def closeEvent(self, event):      ************
-        #print(f"Closing {self.windowTitle()}...")
-        #try:
-        #    self.db.close()
-        #except Exception as e:
-            #print(f"Error closing database connection: {e}")
-        #event.accept()
+    #print(f"Closing {self.windowTitle()}...")
+    #try:
+    #    self.db.close()
+    #except Exception as e:
+    #print(f"Error closing database connection: {e}")
+    #event.accept()
