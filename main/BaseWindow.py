@@ -4,13 +4,14 @@ import psycopg2
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
-    QLabel, QLineEdit
+    QLabel, QLineEdit, QDialog
 )
 from PyQt5 import QtCore, QtGui, QtWidgets
 from psycopg2 import OperationalError, sql
 from Database import Database
-from ChangeDialog import ChangeDialog
+from EditDialog import EditDialog  # Импортируем EditDialog
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class BaseWindow(QMainWindow):
     def __init__(self, title, table_headers, user, password, table_name):
@@ -71,27 +72,20 @@ class BaseWindow(QMainWindow):
             QMessageBox.critical(self, 'Ошибка', f'Ошибка при загрузке данных: {e}')
 
     def add_item(self):
-        try:
-            with Database(self.user, self.password) as db:
-                row_count = self.table_widget.rowCount()
-                self.table_widget.insertRow(row_count)
-                new_id = db.get_next_id(self.table_name)
-                new_id_item = QtWidgets.QTableWidgetItem(str(new_id))
-                self.table_widget.setItem(row_count, 0, new_id_item)
-                for column in range(self.table_widget.columnCount()):
-                    item = self.table_widget.item(row_count, column)
-                    if item is None:
-                        item = QtWidgets.QTableWidgetItem()
-                        self.table_widget.setItem(row_count, column, item)
-                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
-                query_list = []
-                query_list.append(int(new_id))
-                for _ in range(len(self.table_headers) - 1):
-                    query_list.append('')
-                self.changes.append(('insert', None, query_list))
-                QMessageBox.information(self, 'Успех', 'Элемент успешно добавлен!')
-        except Exception as e:
-            QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при добавлении ряда: {e}')
+        dialog = EditDialog(self.table_widget)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            try:
+                with Database(self.user, self.password) as db:
+                    new_id = db.get_next_id(self.table_name)
+                    logging.debug(f"Inserting new row with ID {new_id} and data: {data}")
+                    db.cursor.execute(self.get_insert_query(), (new_id, *data))
+                    db.conn.commit()
+                    self.update_table()
+                    QMessageBox.information(self, 'Успех', 'Элемент успешно добавлен!')
+            except Exception as e:
+                logging.error(f"Error adding row: {e}")
+                QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при добавлении ряда: {e}')
 
     def delete_item(self):
         selected_row = self.table_widget.currentRow()
@@ -122,20 +116,12 @@ class BaseWindow(QMainWindow):
                 self.changes.clear()
                 QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
         except Exception as e:
+            logging.error(f"Error saving changes: {e}")
             QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при сохранении: {e}')
-
-    '''def edit_cell(self, row, column):         Заменено на changer
-        old_item = self.table_widget.item(row, column)
-        if old_item:
-            old_value = old_item.text()
-            new_value = self.table_widget.currentItem().text()
-
-            if old_value != new_value:
-                row_id_item = self.table_widget.item(row, 0)
-                if row_id_item:
-                    row_id = row_id_item.text()
-                    item_data = [self.table_widget.item(row, i).text() for i in range(1, len(self.table_headers))]
-                    self.changes.append(('update', row_id, item_data))'''
+        finally:
+            if db.conn:
+                db.conn.close()
+                logging.debug("Database connection closed.")
 
     def changer(self, row, column):
         if column != 0:
@@ -154,9 +140,9 @@ class BaseWindow(QMainWindow):
         else:
             QMessageBox.warning(self, 'Ошибка', 'Нельзя менять ID.')
 
-
     def valid(self, new_text, column):
         return True
+
     def get_select_query(self):
         raise NotImplementedError
 

@@ -27,7 +27,8 @@ class Database():
                 user=self.user,
                 password=self.password,
                 host=self.host,
-                port=self.port
+                port=self.port,
+                options='-c client_encoding=UTF8'
             )
             self.cursor = self.conn.cursor()
             print("Database connection successful.")
