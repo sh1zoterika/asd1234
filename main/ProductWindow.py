@@ -12,7 +12,7 @@ from BaseWindow import BaseWindow
 from ProductEditDialog import ProductEditDialog
 
 
-class ReceivingWindow(BaseWindow):
+class ProductWindow(BaseWindow):
     def __init__(self, user, password):
         self.user = user
         self.password = password
@@ -20,20 +20,16 @@ class ReceivingWindow(BaseWindow):
             with Database(self.user, self.password) as db:
                 self.combo_box = QComboBox()  # Initialize combo_box here
                 column_names = db.get_column_names('products')
-                super().__init__('Приёмка товаров', column_names, self.user, self.password, 'products')
+                super().__init__('Товары', column_names, self.user, self.password, 'products')
                 self.changes = []  # Для отслеживания изменений
 
-                self.load_warehouses()
                 self.combo_box.currentIndexChanged.connect(self.update_table)
 
-                # Создаем отдельный layout для combo_box и таблицы
-                combo_table_layout = QVBoxLayout()
-                combo_table_layout.addWidget(self.combo_box)
-                combo_table_layout.addWidget(self.table_widget)
+
 
                 # Добавляем combo_table_layout в основной layout
                 main_layout = self.centralWidget().layout()
-                main_layout.insertLayout(0, combo_table_layout)  # Добавляем combo_table_layout в основной layout
+
 
                 self.add_button = QPushButton('Добавить')
                 self.add_button.clicked.connect(self.add_item)
@@ -43,27 +39,18 @@ class ReceivingWindow(BaseWindow):
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при инициализации окна: {e}")
 
-    def load_warehouses(self):
-        try:
-            with Database(self.user, self.password) as db:
-                warehouses = db.get_warehouses()
-                for warehouse in warehouses:
-                    self.combo_box.addItem(warehouse[1], warehouse[0])
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке складов: {e}")
 
     def update_table(self):
         try:
             with Database(self.user, self.password) as db:
-                warehouse_id = self.combo_box.currentData()
-                if warehouse_id is not None:
-                    products = db.get_products_by_warehouse(warehouse_id)
-                    self.table_widget.setRowCount(len(products))
-                    self.table_widget.setColumnCount(len(self.table_headers))
-                    self.table_widget.setHorizontalHeaderLabels(self.table_headers)
-                    for i, product in enumerate(products):
-                        for j, value in enumerate(product):
-                            self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
+                db.cursor.execute('SELECT * FROM Products')
+                products = db.cursor.fetchall()
+                self.table_widget.setRowCount(len(products))
+                self.table_widget.setColumnCount(len(self.table_headers))
+                self.table_widget.setHorizontalHeaderLabels(self.table_headers)
+                for i, product in enumerate(products):
+                    for j, value in enumerate(product):
+                        self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при обновлении таблицы: {e}")
 
@@ -74,9 +61,10 @@ class ReceivingWindow(BaseWindow):
             row_position = self.table_widget.rowCount()
             self.table_widget.insertRow(row_position)
             for col, value in enumerate(data):
-                self.table_widget.setItem(row_position, col, QTableWidgetItem(value))  # Обновляем данные в таблице
+                self.table_widget.setItem(row_position, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
+            self.update_ids()
             self.changes.append(('insert', None, data))
-            QMessageBox.information(self, 'Успех', 'Товар успешно добавлен!')
+            QMessageBox.information(self, 'Успех', 'Элемент успешно добавлен!')
 
     def delete_item(self):
         selected_row = self.table_widget.currentRow()
@@ -131,11 +119,15 @@ class ReceivingWindow(BaseWindow):
             WHERE id = %s
         """
 
-    def get_insert_query(self):
-        return "INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price) VALUES (%s, %s, %s, %s)"
+    def update_ids(self):
+        for row in range(self.table_widget.rowCount()):
+            self.table_widget.setItem(row, 0, QTableWidgetItem(str(row + 1)))
 
-    def get_delete_query(self):
-        return "DELETE FROM ProductInWarehouse WHERE warehouse_id = %s AND product_name = %s"
+    #def get_insert_query(self):
+    #    return "INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price) VALUES (%s, %s, %s, %s)"
 
-    def get_update_query(self):
-        return "UPDATE ProductInWarehouse SET amount = %s, price = %s WHERE warehouse_id = %s AND product_name = %s"
+    #def get_delete_query(self):
+    #    return "DELETE FROM ProductInWarehouse WHERE warehouse_id = %s AND product_name = %s"
+
+    #def get_update_query(self):
+    #    return "UPDATE ProductInWarehouse SET amount = %s, price = %s WHERE warehouse_id = %s AND product_name = %s"

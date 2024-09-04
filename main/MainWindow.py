@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 )
 from psycopg2 import OperationalError, sql
 from SalesWindow import SalesWindow
-from ReceivingWindow import ReceivingWindow
+from ProductWindow import ProductWindow
 from TransferWindow import TransferWindow
 from WriteOffProductWindow import WriteOffProductWindow
 from ClientWindow import ClientWindow
@@ -27,7 +27,7 @@ class MainWindow(QMainWindow):
         self.buttons = {}
         buttons = [
             ('Продажа товаров', self.open_sales_window),
-            ('Приёмка товаров', self.open_receiving_window),
+            ('Товары', self.open_product_window),
             ('Перемещение товаров', self.open_transfer_window),
             ('Списание товаров', self.open_write_off_window),
             ('Клиенты', self.open_clients_window),
@@ -50,9 +50,9 @@ class MainWindow(QMainWindow):
         self.sales_window = SalesWindow(self.user, self.password)
         self.sales_window.show()
 
-    def open_receiving_window(self):
-        self.receiving_window = ReceivingWindow(self.user, self.password)
-        self.receiving_window.show()
+    def open_product_window(self):
+        self.productwindow = ProductWindow(self.user, self.password)
+        self.productwindow.show()
 
     def open_transfer_window(self):
         self.transfer_window = TransferWindow(self.user, self.password)
