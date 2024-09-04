@@ -92,7 +92,7 @@ class TransferWindow(QMainWindow):
         with Database(self.user, self.password) as db:
             from_warehouse_id = self.from_warehouse_combo_box.currentData()
             if from_warehouse_id is not None:
-                products = db.get_products_by_warehouse(from_warehouse_id)
+                products = db.get_product_in_warehouse(from_warehouse_id)
                 self.warehouse_table.setRowCount(len(products))
                 self.move_table.setRowCount(len(products))
                 for i, product in enumerate(products):
@@ -102,7 +102,10 @@ class TransferWindow(QMainWindow):
 
                     # Initialize move_table
                     self.move_table.setItem(i, 0, QTableWidgetItem('0'))
-                    self.move_table.setItem(i, 1, QTableWidgetItem(self.from_warehouse_combo_box.currentText()))
+                    to_warehouse_combo = QComboBox()
+                    to_warehouse_combo.addItem("Выберите склад", None)
+                    self.load_warehouses(to_warehouse_combo)
+                    self.move_table.setCellWidget(i, 1, to_warehouse_combo)
 
     def move_products(self):
         with Database(self.user, self.password) as db:
@@ -110,11 +113,12 @@ class TransferWindow(QMainWindow):
             if from_warehouse_id:
                 for i in range(self.move_table.rowCount()):
                     quantity = self.move_table.item(i, 0).text()
-                    to_warehouse_name = self.move_table.item(i, 1).text()
+                    to_warehouse_combo = self.move_table.cellWidget(i, 1)
+                    to_warehouse_id = to_warehouse_combo.currentData()
                     product_name = self.warehouse_table.item(i, 0).text()
 
-                    if quantity and to_warehouse_name:
-                        to_warehouse_id = db.get_warehouse_id_by_name(to_warehouse_name)
+                    if quantity and to_warehouse_combo:
+                        to_warehouse_id = db.get_warehouse_id_by_name(to_warehouse_combo)
                         if to_warehouse_id:
                             self.changes.append(('move', from_warehouse_id, to_warehouse_id, product_name, quantity))
 

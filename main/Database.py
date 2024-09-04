@@ -112,7 +112,7 @@ class Database():
             result = self.cursor.fetchall()
             return result
         except Exception as e:
-            print(f"Ошибка при товаров на складе: {e}")
+            print(f"Ошибка при выводе товаров на складе: {e}")
             return None
 
     def get_next_id(self, table_name):

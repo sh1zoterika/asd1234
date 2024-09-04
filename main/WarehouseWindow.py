@@ -37,7 +37,7 @@ class WarehouseWindow(BaseWindow):
             row_data = [self.table_widget.item(row, col).text() for col in range(self.table_widget.columnCount())]
             warehouseid = row_data[0]
             viewproduct = ViewProductWindow(self.user, self.password, warehouseid)
-            viewproduct.show()
+            viewproduct.exec_()
         else:
             QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите склад.')
 

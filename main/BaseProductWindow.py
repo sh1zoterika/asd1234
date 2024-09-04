@@ -67,7 +67,7 @@ class BaseProductWindow(QMainWindow):
         warehouse_id = self.combo_box.currentData()
         if warehouse_id is not None:
             try:
-                with self.db as db:
+                with Database(self.user, self.password) as db:
                     db.cursor.execute(self.query['select'], (warehouse_id,))
                     products = db.cursor.fetchall()
 
