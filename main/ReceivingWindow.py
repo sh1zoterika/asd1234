@@ -4,11 +4,12 @@ import psycopg2
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
-    QLabel, QLineEdit
+    QLabel, QLineEdit, QDialog
 )
 from psycopg2 import OperationalError, sql
 from Database import Database
 from BaseWindow import BaseWindow
+from ProductEditDialog import ProductEditDialog
 
 
 class ReceivingWindow(BaseWindow):
@@ -18,8 +19,8 @@ class ReceivingWindow(BaseWindow):
         try:
             with Database(self.user, self.password) as db:
                 self.combo_box = QComboBox()  # Initialize combo_box here
-                column_names = db.get_column_names('productinwarehouse')
-                super().__init__('Приёмка товаров', column_names, self.user, self.password, 'productinwarehouse')
+                column_names = db.get_column_names('products')
+                super().__init__('Приёмка товаров', column_names, self.user, self.password, 'products')
                 self.changes = []  # Для отслеживания изменений
 
                 self.load_warehouses()
@@ -33,6 +34,10 @@ class ReceivingWindow(BaseWindow):
                 # Добавляем combo_table_layout в основной layout
                 main_layout = self.centralWidget().layout()
                 main_layout.insertLayout(0, combo_table_layout)  # Добавляем combo_table_layout в основной layout
+
+                self.add_button = QPushButton('Добавить')
+                self.add_button.clicked.connect(self.add_item)
+                main_layout.addWidget(self.add_button)
 
                 self.update_table()
         except Exception as e:
@@ -57,79 +62,74 @@ class ReceivingWindow(BaseWindow):
                     self.table_widget.setColumnCount(len(self.table_headers))
                     self.table_widget.setHorizontalHeaderLabels(self.table_headers)
                     for i, product in enumerate(products):
-                        self.table_widget.setItem(i, 0, QTableWidgetItem(product[0]))
-                        self.table_widget.setItem(i, 1, QTableWidgetItem(str(product[1])))
-                        self.table_widget.setItem(i, 2, QTableWidgetItem(str(product[2])))
+                        for j, value in enumerate(product):
+                            self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при обновлении таблицы: {e}")
 
     def add_item(self):
-        try:
+        dialog = ProductEditDialog(self.table_widget)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
             row_position = self.table_widget.rowCount()
             self.table_widget.insertRow(row_position)
-            self.table_widget.setItem(row_position, 0, QTableWidgetItem('Новый товар'))
-            self.table_widget.setItem(row_position, 1, QTableWidgetItem('0'))
-            self.table_widget.setItem(row_position, 2, QTableWidgetItem('0'))
-            self.changes.append(('insert', row_position, ['Новый товар', 0, 0]))
+            for col, value in enumerate(data):
+                self.table_widget.setItem(row_position, col, QTableWidgetItem(value))  # Обновляем данные в таблице
+            self.changes.append(('insert', None, data))
             QMessageBox.information(self, 'Успех', 'Товар успешно добавлен!')
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при добавлении товара: {e}")
 
     def delete_item(self):
-        try:
-            selected_row = self.table_widget.currentRow()
-            if selected_row >= 0:
-                self.changes.append(('delete', selected_row, None))
-                self.table_widget.removeRow(selected_row)
-                QMessageBox.information(self, "Успех", "Товар успешно удален!")
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при удалении товара: {e}")
+        selected_row = self.table_widget.currentRow()
+        if selected_row >= 0:
+            id_item = self.table_widget.item(selected_row, 0)
+            if id_item:
+                self.changes.append(('delete', id_item.text(), None))
+            self.table_widget.removeRow(selected_row)
+            QMessageBox.information(self, 'Успех', 'Товар успешно удалён!')
 
     def cancel_changes(self):
-        try:
-            self.update_table()
-            self.changes.clear()
-            QMessageBox.information(self, "Успех", "Изменения успешно отменены!")
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при отмене изменений: {e}")
+        self.update_table()
+        self.changes.clear()
+        QMessageBox.information(self, 'Успех', 'Изменения успешно откатаны')
 
     def save_changes(self):
         try:
             with Database(self.user, self.password) as db:
-                warehouse_id = self.combo_box.currentData()
-                if warehouse_id is not None:
-                    connection = self.connect_db()
-                    cursor = connection.cursor()
-                    connection.autocommit = False
-
-                    for change in self.changes:
-                        change_type, row_index, row_data = change
-                        if change_type == 'insert':
-                            product_name = row_data[0]
-                            quantity = int(row_data[1])
-                            price = float(row_data[2])
-                            cursor.execute("""
-                                INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price)
-                                VALUES (%s, %s, %s, %s)
-                            """, (warehouse_id, product_name, quantity, price))
-                        elif change_type == 'delete':
-                            product_name = self.table_widget.item(row_index, 0).text()
-                            cursor.execute("""
-                                DELETE FROM ProductInWarehouse
-                                WHERE warehouse_id = %s AND product_name = %s
-                            """, (warehouse_id, product_name))
-
-                    connection.commit()
-                    connection.close()
-                    self.changes.clear()
-                QMessageBox.information(self, "Успех", "Изменения успешно сохранены!")
+                for change in self.changes:
+                    change_type, row_id, row_data = change
+                    if change_type == 'insert':
+                        new_id = db.get_next_id('products')
+                        db.cursor.execute(self.get_insert_query(), (new_id, *row_data))
+                    elif change_type == 'delete':
+                        db.cursor.execute(self.get_delete_query(), (row_id,))
+                    elif change_type == 'update':
+                        db.cursor.execute(self.get_update_query(), row_data + [row_id])
+                
+                db.conn.commit()
+                self.changes.clear()
+                QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
         except Exception as e:
-            if connection:
-                connection.rollback()
-            QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
+            logging.error(f"Error saving changes: {e}")
+            QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при сохранении: {e}')
+        finally:
+            if db.conn:
+                db.conn.close()
+                logging.debug("Database connection closed.")
 
-    def get_select_query(self):
-        return "SELECT product_name, amount, price FROM ProductInWarehouse WHERE warehouse_id = %s"
+    def get_insert_query(self):
+        return """
+            INSERT INTO Products (id, name, article, lifetime, description, category, png_url)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """
+
+    def get_delete_query(self):
+        return "DELETE FROM Products WHERE id = %s"
+
+    def get_update_query(self):
+        return """
+            UPDATE Products SET name = %s, article = %s, lifetime = %s, description = %s, category = %s, png_url = %s
+            WHERE id = %s
+        """
 
     def get_insert_query(self):
         return "INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price) VALUES (%s, %s, %s, %s)"

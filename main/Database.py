@@ -112,7 +112,7 @@ class Database():
             result = self.cursor.fetchall()
             return result
         except Exception as e:
-            print(f"Ошибка при выводе товаров на складе: {e}")
+            print(f"Ошибка при товаров на складе: {e}")
             return None
 
     def get_next_id(self, table_name):
@@ -132,4 +132,29 @@ class Database():
                 self.cursor.execute(f"UPDATE {table_name} SET id = %s WHERE id = %s", (new_id, old_id))
         except Exception as e:
             print(f"Ошибка при нумерации: {e}")
+            return None
+        
+    def get_products_by_warehouse(self, warehouse_id):
+        try:
+            query = """
+            SELECT p.name, piw.amount
+            FROM ProductInWarehouse piw
+            JOIN Products p ON piw.product_id = p.id
+            WHERE piw.warehouse_id = %s
+            """
+            self.cursor.execute(query, (warehouse_id,))
+            result = self.cursor.fetchall()
+            return result
+        except Exception as e:
+            print(f"Error fetching products by warehouse: {e}")
+            return []
+        
+    def get_product_id_by_name(self, product_name):
+        try:
+            query = "SELECT id FROM Products WHERE name = %s"
+            self.cursor.execute(query, (product_name,))
+            result = self.cursor.fetchone()
+            return result[0] if result else None
+        except Exception as e:
+            print(f"Error fetching product ID by name: {e}")
             return None
