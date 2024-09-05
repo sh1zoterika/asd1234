@@ -56,18 +56,22 @@ class CurrentOrderWindow(QMainWindow):
         try:
             with Database(self.user, self.password) as db:
                 db.cursor.execute("""
-                    SELECT Orders.id, Clients.name 
+                    SELECT Orders.id, Clients.name, Orders.price, Orders.date, Orders.status
                     FROM Orders
                     JOIN Clients ON Orders.client_id = Clients.id
+                    WHERE Orders.status = 'В процессе'
                 """)
                 orders = db.cursor.fetchall()
 
             self.table_widget.setRowCount(len(orders))
-            self.table_widget.setColumnCount(2)
-            self.table_widget.setHorizontalHeaderLabels(["ID", "Клиент"])
+            self.table_widget.setColumnCount(5)
+            self.table_widget.setHorizontalHeaderLabels(["ID", "Клиент", "Цена", "Дата", "Статус"])
             for i, order in enumerate(orders):
                 self.table_widget.setItem(i, 0, QTableWidgetItem(str(order[0])))
                 self.table_widget.setItem(i, 1, QTableWidgetItem(order[1]))
+                self.table_widget.setItem(i, 2, QTableWidgetItem(str(order[2])))
+                self.table_widget.setItem(i, 3, QTableWidgetItem(order[3].strftime('%Y-%m-%d %H:%M:%S')))
+                self.table_widget.setItem(i, 4, QTableWidgetItem(order[4]))
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке данных: {e}")
 
@@ -76,7 +80,10 @@ class CurrentOrderWindow(QMainWindow):
         self.table_widget.insertRow(row_position)
         self.table_widget.setItem(row_position, 0, QTableWidgetItem(''))  # ID будет автоматически присвоен
         self.table_widget.setItem(row_position, 1, QTableWidgetItem('Новый клиент'))
-        self.changes.append(('insert', None, ['Новый клиент']))
+        self.table_widget.setItem(row_position, 2, QTableWidgetItem('0'))  # Начальная цена
+        self.table_widget.setItem(row_position, 3, QTableWidgetItem('2023-01-01 00:00:00'))  # Начальная дата
+        self.table_widget.setItem(row_position, 4, QTableWidgetItem('В процессе'))  # Начальный статус
+        self.changes.append(('insert', None, ['Новый клиент', '0', '2023-01-01 00:00:00', 'В процессе']))
         QMessageBox.information(self, "Успех", "Заказ успешно добавлен!")
 
     def delete_order(self):
@@ -105,8 +112,8 @@ class CurrentOrderWindow(QMainWindow):
                     change_type, row_id, row_data = change
                     if change_type == 'insert':
                         db.cursor.execute(
-                            "INSERT INTO Orders (client_name) VALUES (%s)",
-                            (row_data[0],)
+                            "INSERT INTO Orders (client_id, price, date, status) VALUES (%s, %s, %s, %s)",
+                            (row_data[0], row_data[1], row_data[2], row_data[3])
                         )
                     elif change_type == 'delete':
                         db.cursor.execute(
@@ -115,8 +122,8 @@ class CurrentOrderWindow(QMainWindow):
                         )
                     elif change_type == 'update':
                         db.cursor.execute(
-                            "UPDATE Orders SET client_name = %s WHERE id = %s",
-                            (row_data[0], row_id)
+                            "UPDATE Orders SET client_id = %s, price = %s, date = %s, status = %s WHERE id = %s",
+                            (row_data[0], row_data[1], row_data[2], row_data[3], row_id)
                         )
 
                 db.conn.commit()

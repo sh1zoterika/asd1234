@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
     QLabel, QLineEdit
 )
+from PyQt5 import QtCore
 from psycopg2 import OperationalError, sql
 from Database import Database
 from BaseProductWindow import BaseProductWindow
@@ -25,11 +26,31 @@ class AddProductWindow(BaseProductWindow):
         super().__init__('Добавить товары в заказ', (600, 200, 1000, 600), headers, query, self.user, self.password, parent)
         self.order_id = order_id
 
-        # Button to add products to the order
+        # Кнопка добавления товара в заказ
         self.add_button = QPushButton('Добавить')
         self.add_button.clicked.connect(self.add_products_to_order)
         layout = self.centralWidget().layout()
         layout.addWidget(self.add_button)
+
+        # Делая ячейки таблицы доступными только для чтения
+        self.make_table_read_only()
+
+    def make_table_read_only(self):
+        for row in range(self.warehouse_table.rowCount()):
+            for col in range(self.warehouse_table.columnCount()):
+                item = self.warehouse_table.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+        for row in range(self.warehouse_table.rowCount()):
+            for col in range(self.warehouse_table.columnCount()):
+                item = self.warehouse_table.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+        for row in range(self.order_table.rowCount()):
+            for col in range(self.order_table.columnCount()):
+                item = self.order_table.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
 
     def add_products_to_order(self):
         self.warehouse_id = self.combo_box.currentData()
