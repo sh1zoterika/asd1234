@@ -31,10 +31,6 @@ class ProductWindow(BaseWindow):
                 main_layout = self.centralWidget().layout()
 
 
-                self.add_button = QPushButton('Добавить')
-                self.add_button.clicked.connect(self.add_item)
-                main_layout.addWidget(self.add_button)
-
                 self.update_table()
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при инициализации окна: {e}")
@@ -106,8 +102,8 @@ class ProductWindow(BaseWindow):
 
     def get_insert_query(self):
         return """
-            INSERT INTO Products (id, name, article, lifetime, description, category, png_url)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO Products (id, name, article, lifetime, description, category, png_url, price)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """
 
     def get_delete_query(self):
