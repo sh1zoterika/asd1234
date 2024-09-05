@@ -13,6 +13,7 @@ from TransferWindow import TransferWindow
 from WriteOffProductWindow import WriteOffProductWindow
 from ClientWindow import ClientWindow
 from WarehouseWindow import WarehouseWindow
+from ReceivingWindow import ReceivingWindow
 
 
 class MainWindow(QMainWindow):
@@ -28,6 +29,7 @@ class MainWindow(QMainWindow):
         buttons = [
             ('Продажа товаров', self.open_sales_window),
             ('Товары', self.open_product_window),
+            ('Приёмка товаров', self.open_receiving_window),
             ('Перемещение товаров', self.open_transfer_window),
             ('Списание товаров', self.open_write_off_window),
             ('Клиенты', self.open_clients_window),
@@ -53,6 +55,10 @@ class MainWindow(QMainWindow):
     def open_product_window(self):
         self.productwindow = ProductWindow(self.user, self.password)
         self.productwindow.show()
+
+    def open_receiving_window(self):
+        self.receivingwindow = ReceivingWindow(self.user, self.password)
+        self.receivingwindow.show()
 
     def open_transfer_window(self):
         self.transfer_window = TransferWindow(self.user, self.password)
