@@ -10,7 +10,6 @@ from psycopg2 import OperationalError, sql
 from Database import Database
 
 
-
 class TransferWindow(QMainWindow):
     def __init__(self, user, password):
         self.user = user
@@ -44,10 +43,8 @@ class TransferWindow(QMainWindow):
 
         # Table for products in the selected warehouse
         self.warehouse_table = QTableWidget()
-        self.warehouse_table.setColumnCount(4)
-        with Database(self.user, self.password) as db:
-            column_names = db.get_column_names('productinwarehouse')
-        self.warehouse_table.setHorizontalHeaderLabels(column_names)
+        self.warehouse_table.setColumnCount(3)
+        self.warehouse_table.setHorizontalHeaderLabels(['ID товара', 'Название товара', 'Количество'])
         main_layout.addWidget(self.warehouse_table)
 
         # Table for moving products
@@ -92,12 +89,18 @@ class TransferWindow(QMainWindow):
         with Database(self.user, self.password) as db:
             from_warehouse_id = self.from_warehouse_combo_box.currentData()
             if from_warehouse_id is not None:
-                products = db.get_product_in_warehouse(from_warehouse_id)
+                db.cursor.execute("""
+                    SELECT Products.id, Products.name, ProductInWarehouse.amount
+                    FROM ProductInWarehouse
+                    JOIN Products ON Products.id = ProductInWarehouse.product_id
+                    WHERE ProductInWarehouse.warehouse_id = %s
+                """, (from_warehouse_id,))
+                products = db.cursor.fetchall()
                 self.warehouse_table.setRowCount(len(products))
                 self.move_table.setRowCount(len(products))
                 for i, product in enumerate(products):
-                    self.warehouse_table.setItem(i, 0, QTableWidgetItem(product[0]))
-                    self.warehouse_table.setItem(i, 1, QTableWidgetItem(str(product[1])))
+                    self.warehouse_table.setItem(i, 0, QTableWidgetItem(str(product[0])))
+                    self.warehouse_table.setItem(i, 1, QTableWidgetItem(product[1]))
                     self.warehouse_table.setItem(i, 2, QTableWidgetItem(str(product[2])))
 
                     # Initialize move_table
@@ -108,21 +111,20 @@ class TransferWindow(QMainWindow):
                     self.move_table.setCellWidget(i, 1, to_warehouse_combo)
 
     def move_products(self):
-        with Database(self.user, self.password) as db:
-            from_warehouse_id = self.from_warehouse_combo_box.currentData()
-            if from_warehouse_id:
-                for i in range(self.move_table.rowCount()):
-                    quantity = self.move_table.item(i, 0).text()
-                    to_warehouse_combo = self.move_table.cellWidget(i, 1)
-                    to_warehouse_id = to_warehouse_combo.currentData()
-                    product_name = self.warehouse_table.item(i, 0).text()
+        from_warehouse_id = self.from_warehouse_combo_box.currentData()
+        if from_warehouse_id:
+            for i in range(self.move_table.rowCount()):
+                quantity = int(self.move_table.item(i, 0).text())
+                to_warehouse_combo = self.move_table.cellWidget(i, 1)
+                to_warehouse_id = to_warehouse_combo.currentData()
+                product_id = self.warehouse_table.item(i, 0).text()
 
-                    if quantity and to_warehouse_combo:
-                        to_warehouse_id = db.get_warehouse_id_by_name(to_warehouse_combo)
-                        if to_warehouse_id:
-                            self.changes.append(('move', from_warehouse_id, to_warehouse_id, product_name, quantity))
+                if quantity > 0 and to_warehouse_id:
+                    self.changes.append(('move', from_warehouse_id, to_warehouse_id, product_id, quantity))
 
-            QMessageBox.information(self, 'Успех', 'Товары перемещены!')
+            QMessageBox.information(self, 'Успех', 'Товары подготовлены к перемещению. Нажмите "Сохранить" для подтверждения.')
+        else:
+            QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите склад.')
 
     def cancel_changes(self):
         self.update_table()
@@ -133,21 +135,31 @@ class TransferWindow(QMainWindow):
         try:
             with Database(self.user, self.password) as db:
                 for change in self.changes:
-                    change_type, from_warehouse, to_warehouse, product_name, quantity = change
+                    change_type, from_warehouse, to_warehouse, product_id, quantity = change
                     if change_type == 'move':
                         # Move product from one warehouse to another
                         db.cursor.execute("""
                             UPDATE ProductInWarehouse
                             SET amount = amount - %s
-                            WHERE warehouse_id = %s AND product_name = %s
-                        """, (quantity, from_warehouse, product_name))
+                            WHERE warehouse_id = %s AND product_id = %s
+                        """, (quantity, from_warehouse, product_id))
 
                         db.cursor.execute("""
-                            INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price)
-                            VALUES (%s, %s, %s, (SELECT price FROM ProductInWarehouse WHERE warehouse_id = %s AND product_name = %s))
-                            ON CONFLICT (warehouse_id, product_name)
-                            DO UPDATE SET amount = ProductInWarehouse.amount + EXCLUDED.amount
-                        """, (to_warehouse, product_name, quantity, from_warehouse, product_name))
+                            SELECT amount FROM ProductInWarehouse
+                            WHERE warehouse_id = %s AND product_id = %s
+                        """, (to_warehouse, product_id))
+                        result = db.cursor.fetchone()
+                        if result:
+                            db.cursor.execute("""
+                                UPDATE ProductInWarehouse
+                                SET amount = amount + %s
+                                WHERE warehouse_id = %s AND product_id = %s
+                            """, (quantity, to_warehouse, product_id))
+                        else:
+                            db.cursor.execute("""
+                                INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount)
+                                VALUES (%s, %s, %s)
+                            """, (to_warehouse, product_id, quantity))
 
                 db.conn.commit()
                 self.changes.clear()
@@ -155,4 +167,5 @@ class TransferWindow(QMainWindow):
         except Exception as e:
             if db.conn:
                 db.conn.rollback()
+            logging.error(f"Error saving changes: {e}")
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
