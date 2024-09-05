@@ -64,7 +64,7 @@ class Database():
     def get_products_by_order(self, order_id):
         try:
             query = """
-            SELECT p.name, oi.amount, oi.price 
+            SELECT p.id, p.name, oi.amount, oi.price 
             FROM Order_items oi 
             JOIN Products p ON oi.product_id = p.id 
             WHERE oi.order_id = %s

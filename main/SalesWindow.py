@@ -77,15 +77,16 @@ class SalesWindow(QMainWindow):
                 order_id = self.orders_combo.currentData()
                 products = db.get_products_by_order(order_id)
                 self.table_widget.setRowCount(len(products))
-                self.table_widget.setColumnCount(5)
-                column_names = db.get_column_names('orders')
-                self.table_widget.setHorizontalHeaderLabels(column_names)
-                for i, (name, amount, price) in enumerate(products):
-                    self.table_widget.setItem(i, 0, QTableWidgetItem(name))
-                    self.table_widget.setItem(i, 1, QTableWidgetItem(str(amount)))
-                    self.table_widget.setItem(i, 2, QTableWidgetItem(str(price)))
+                self.table_widget.setColumnCount(4)
+                headers = ['Product ID', 'Product Name', 'Amount', 'Price']
+                self.table_widget.setHorizontalHeaderLabels(headers)
+                for i, (id, name, amount, price) in enumerate(products):
+                    self.table_widget.setItem(i, 0, QTableWidgetItem(str(id)))
+                    self.table_widget.setItem(i, 1, QTableWidgetItem(str(name)))
+                    self.table_widget.setItem(i, 2, QTableWidgetItem(str(amount)))
+                    self.table_widget.setItem(i, 3, QTableWidgetItem(str(price)))
         except Exception as e:
-            print(f"Error updating table: {e}")
+            print(f"Error updating sales table: {e}")
             QMessageBox.critical(self, "Error", f"Error updating table: {e}")
 
     def open_current_orders_window(self):
