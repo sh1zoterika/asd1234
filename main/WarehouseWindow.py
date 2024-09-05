@@ -127,6 +127,8 @@ class WarehouseWindow(BaseWindow):
         dialog = EditDialog(self.table_widget, row)
         if dialog.exec_() == QDialog.Accepted:
             data = dialog.get_data()
+            logging.debug(f"Collected data for update: {data}")
             for col, value in enumerate(data):
                 self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
-            self.save_changes(row, data)
+            self.changes.append(('update', self.table_widget.item(row, 0).text(), data))
+            QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')

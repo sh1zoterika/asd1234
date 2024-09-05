@@ -26,7 +26,7 @@ class BaseWindow(QMainWindow):
 
         self.table_widget = QTableWidget()
         layout.addWidget(self.table_widget)
-        self.table_widget.cellDoubleClicked.connect(self.changer)
+        self.table_widget.cellDoubleClicked.connect(self.edit_item)  # Добавляем обработчик двойного клика
 
         button_layout = QHBoxLayout()
 
@@ -56,6 +56,17 @@ class BaseWindow(QMainWindow):
         self.update_table()
         self.changes = []  # Для отслеживания изменений
 
+    def edit_item(self, row, column):
+        logging.debug(f"Opening EditDialog for row {row}, column {column}")
+        dialog = EditDialog(self.table_widget, row)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            logging.debug(f"Collected data: {data}")
+            for col, value in enumerate(data):
+                self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
+            self.changes.append(('update', row, data))
+            QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
+
     def update_table(self):
         try:
             with Database(self.user, self.password) as db:
@@ -69,6 +80,7 @@ class BaseWindow(QMainWindow):
                     for j, value in enumerate(item):
                         self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
         except Exception as e:
+            logging.error(f"Error loading data: {e}")
             QMessageBox.critical(self, 'Ошибка', f'Ошибка при загрузке данных: {e}')
 
     def add_item(self):
@@ -122,23 +134,6 @@ class BaseWindow(QMainWindow):
             if db.conn:
                 db.conn.close()
                 logging.debug("Database connection closed.")
-
-    def changer(self, row, column):
-        if column != 0:
-            item = self.table_widget.item(row, column)
-            text = item.text() if item else ''
-            dialog = ChangeDialog(text)
-            if dialog.exec_() == QtWidgets.QDialog.Accepted:
-                new_text = str(dialog.get_text())
-                if self.valid(new_text, column):
-                    item_data = QtWidgets.QTableWidgetItem(new_text)
-                    item_data.setFlags(item_data.flags() & ~QtCore.Qt.ItemIsEditable)
-                    self.table_widget.setItem(row, column, item_data)
-                    self.changes.append(('update', row, item_data))
-                else:
-                    QMessageBox.warning(self, 'Ошибка', 'Текст не валиден')
-        else:
-            QMessageBox.warning(self, 'Ошибка', 'Нельзя менять ID.')
 
     def valid(self, new_text, column):
         return True
