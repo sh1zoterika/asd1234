@@ -25,16 +25,12 @@ class ProductWindow(BaseWindow):
 
                 self.combo_box.currentIndexChanged.connect(self.update_table)
 
-
-
                 # Добавляем combo_table_layout в основной layout
                 main_layout = self.centralWidget().layout()
-
 
                 self.update_table()
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при инициализации окна: {e}")
-
 
     def update_table(self):
         try:
@@ -81,12 +77,16 @@ class ProductWindow(BaseWindow):
             with Database(self.user, self.password) as db:
                 for change in self.changes:
                     change_type, row_id, row_data = change
+                    logging.debug(f"Processing change: {change_type}, {row_id}, {row_data}")
                     if change_type == 'insert':
                         new_id = db.get_next_id('products')
+                        logging.debug(f"Inserting new row with ID {new_id} and data: {row_data}")
                         db.cursor.execute(self.get_insert_query(), (new_id, *row_data))
                     elif change_type == 'delete':
+                        logging.debug(f"Deleting row with ID {row_id}")
                         db.cursor.execute(self.get_delete_query(), (row_id,))
                     elif change_type == 'update':
+                        logging.debug(f"Updating row with ID {row_id} and data: {row_data}")
                         db.cursor.execute(self.get_update_query(), row_data + [row_id])
                 
                 db.conn.commit()
@@ -111,7 +111,7 @@ class ProductWindow(BaseWindow):
 
     def get_update_query(self):
         return """
-            UPDATE Products SET name = %s, article = %s, lifetime = %s, description = %s, category = %s, png_url = %s
+            UPDATE Products SET name = %s, article = %s, lifetime = %s, description = %s, category = %s, png_url = %s, price = %s
             WHERE id = %s
         """
 
@@ -119,11 +119,13 @@ class ProductWindow(BaseWindow):
         for row in range(self.table_widget.rowCount()):
             self.table_widget.setItem(row, 0, QTableWidgetItem(str(row + 1)))
 
-    #def get_insert_query(self):
-    #    return "INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price) VALUES (%s, %s, %s, %s)"
-
-    #def get_delete_query(self):
-    #    return "DELETE FROM ProductInWarehouse WHERE warehouse_id = %s AND product_name = %s"
-
-    #def get_update_query(self):
-    #    return "UPDATE ProductInWarehouse SET amount = %s, price = %s WHERE warehouse_id = %s AND product_name = %s"
+    def edit_item(self, row, column):
+        logging.debug(f"Opening ProductEditDialog for row {row}, column {column}")
+        dialog = ProductEditDialog(self.table_widget, row)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            logging.debug(f"Collected data for update: {data}")
+            for col, value in enumerate(data):
+                self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
+            self.changes.append(('update', self.table_widget.item(row, 0).text(), data))
+            QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
