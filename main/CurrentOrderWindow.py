@@ -4,10 +4,11 @@ import psycopg2
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
-    QLabel, QLineEdit
+    QLabel, QLineEdit, QDialog
 )
 from psycopg2 import OperationalError, sql
 from Database import Database
+from EditDialog import EditDialog
 
 
 class CurrentOrderWindow(QMainWindow):
@@ -22,6 +23,7 @@ class CurrentOrderWindow(QMainWindow):
 
         self.table_widget = QTableWidget()
         layout.addWidget(self.table_widget)
+        self.table_widget.cellDoubleClicked.connect(self.edit_item)  # Добавляем обработчик двойного клика
 
         button_layout = QHBoxLayout()
 
@@ -125,6 +127,13 @@ class CurrentOrderWindow(QMainWindow):
                 db.conn.rollback()
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
 
-    def edit_cell(self, row, column):
-        # Implement if needed for inline cell editing
-        pass
+    def edit_item(self, row, column):
+        logging.debug(f"Opening EditDialog for row {row}, column {column}")
+        dialog = EditDialog(self.table_widget, row)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            logging.debug(f"Collected data for update: {data}")
+            for col, value in enumerate(data):
+                self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
+            self.changes.append(('update', self.table_widget.item(row, 0).text(), data))
+            QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
