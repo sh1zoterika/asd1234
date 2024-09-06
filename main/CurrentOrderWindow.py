@@ -6,10 +6,11 @@ from PyQt5.QtWidgets import (
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
     QLabel, QLineEdit, QDialog
 )
+from PyQt5 import QtCore
 from psycopg2 import OperationalError, sql
 from Database import Database
 from EditDialog import EditDialog
-from PyQt5 import QtCore
+from datetime import datetime
 
 
 class CurrentOrderWindow(QMainWindow):
@@ -21,6 +22,11 @@ class CurrentOrderWindow(QMainWindow):
         self.setGeometry(600, 200, 800, 600)
 
         layout = QVBoxLayout()
+
+        # ComboBox для выбора клиента
+        self.client_combo = QComboBox()
+        layout.addWidget(self.client_combo)
+        self.client_combo.currentIndexChanged.connect(self.update_table)
 
         self.table_widget = QTableWidget()
         layout.addWidget(self.table_widget)
@@ -50,43 +56,61 @@ class CurrentOrderWindow(QMainWindow):
         container.setLayout(layout)
         self.setCentralWidget(container)
 
+        self.update_clients()
         self.update_table()
         self.changes = []  # To track changes
 
-    def update_table(self):
+    def update_clients(self):
         try:
             with Database(self.user, self.password) as db:
-                db.cursor.execute("""
-                    SELECT Orders.id, Clients.name, Orders.price, Orders.date, Orders.status
-                    FROM Orders
-                    JOIN Clients ON Orders.client_id = Clients.id
-                    WHERE Orders.status = 'В процессе'
-                """)
-                orders = db.cursor.fetchall()
+                db.cursor.execute("SELECT id, name FROM Clients")
+                clients = db.cursor.fetchall()
+                self.client_combo.clear()
+                for client in clients:
+                    self.client_combo.addItem(client[1], client[0])
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке клиентов: {e}")
 
-            self.table_widget.setRowCount(len(orders))
-            self.table_widget.setColumnCount(5)
-            self.table_widget.setHorizontalHeaderLabels(["ID", "Клиент", "Цена", "Дата", "Статус"])
-            for i, order in enumerate(orders):
-                self.table_widget.setItem(i, 0, QTableWidgetItem(str(order[0])))
-                self.table_widget.setItem(i, 1, QTableWidgetItem(order[1]))
-                self.table_widget.setItem(i, 2, QTableWidgetItem(str(order[2])))
-                self.table_widget.setItem(i, 3, QTableWidgetItem(order[3].strftime('%Y-%m-%d %H:%M:%S')))
-                self.table_widget.setItem(i, 4, QTableWidgetItem(order[4]))
-            self.make_table_read_only()
+    def update_table(self):
+        try:
+            client_id = self.client_combo.currentData()
+            if client_id is not None:
+                with Database(self.user, self.password) as db:
+                    db.cursor.execute("""
+                        SELECT Orders.id, Clients.name, Orders.price, Orders.date, Orders.status
+                        FROM Orders
+                        JOIN Clients ON Orders.client_id = Clients.id
+                        WHERE Orders.client_id = %s AND Orders.status = 'В процессе'
+                    """, (client_id,))
+                    orders = db.cursor.fetchall()
+
+                self.table_widget.setRowCount(len(orders))
+                self.table_widget.setColumnCount(5)
+                self.table_widget.setHorizontalHeaderLabels(["ID", "Клиент", "Цена", "Дата", "Статус"])
+                for i, order in enumerate(orders):
+                    self.table_widget.setItem(i, 0, QTableWidgetItem(str(order[0])))
+                    self.table_widget.setItem(i, 1, QTableWidgetItem(order[1]))
+                    self.table_widget.setItem(i, 2, QTableWidgetItem(str(order[2])))
+                    self.table_widget.setItem(i, 3, QTableWidgetItem(order[3].strftime('%Y-%m-%d %H:%M:%S')))
+                    self.table_widget.setItem(i, 4, QTableWidgetItem(order[4]))
+                self.make_table_read_only()
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке данных: {e}")
 
     def add_order(self):
-        row_position = self.table_widget.rowCount()
-        self.table_widget.insertRow(row_position)
-        self.table_widget.setItem(row_position, 0, QTableWidgetItem(''))  # ID будет автоматически присвоен
-        self.table_widget.setItem(row_position, 1, QTableWidgetItem('Новый клиент'))
-        self.table_widget.setItem(row_position, 2, QTableWidgetItem('0'))  # Начальная цена
-        self.table_widget.setItem(row_position, 3, QTableWidgetItem('2023-01-01 00:00:00'))  # Начальная дата
-        self.table_widget.setItem(row_position, 4, QTableWidgetItem('В процессе'))  # Начальный статус
-        self.changes.append(('insert', None, ['Новый клиент', '0', '2023-01-01 00:00:00', 'В процессе']))
-        QMessageBox.information(self, "Успех", "Заказ успешно добавлен!")
+        client_id = self.client_combo.currentData()
+        if client_id is not None:
+            row_position = self.table_widget.rowCount()
+            self.table_widget.insertRow(row_position)
+            self.table_widget.setItem(row_position, 0, QTableWidgetItem(''))  # ID будет автоматически присвоен
+            self.table_widget.setItem(row_position, 1, QTableWidgetItem(self.client_combo.currentText()))
+            self.table_widget.setItem(row_position, 2, QTableWidgetItem('0'))  # Начальная цена
+            self.table_widget.setItem(row_position, 3, QTableWidgetItem(datetime.now().strftime('%Y-%m-%d %H:%M:%S')))  # Текущая дата
+            self.table_widget.setItem(row_position, 4, QTableWidgetItem('В процессе'))  # Начальный статус
+            self.changes.append(('insert', client_id, ['0', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 'В процессе']))
+            QMessageBox.information(self, "Успех", "Заказ успешно добавлен!")
+        else:
+            QMessageBox.warning(self, "Ошибка", "Пожалуйста, выберите клиента.")
 
     def delete_order(self):
         selected_row = self.table_widget.currentRow()
@@ -111,21 +135,22 @@ class CurrentOrderWindow(QMainWindow):
         try:
             with Database(self.user, self.password) as db:
                 for change in self.changes:
-                    change_type, row_id, row_data = change
+                    change_type, client_id, row_data = change
                     if change_type == 'insert':
+                        new_id = db.get_next_id('orders')
                         db.cursor.execute(
-                            "INSERT INTO Orders (client_id, price, date, status) VALUES (%s, %s, %s, %s)",
-                            (row_data[0], row_data[1], row_data[2], row_data[3])
+                            "INSERT INTO Orders (id, client_id, price, date, status) VALUES (%s, %s, %s, %s, %s)",
+                            (new_id, client_id, row_data[0], row_data[1], row_data[2])
                         )
                     elif change_type == 'delete':
                         db.cursor.execute(
                             "DELETE FROM Orders WHERE id = %s",
-                            (row_id,)
+                            (client_id,)
                         )
                     elif change_type == 'update':
                         db.cursor.execute(
-                            "UPDATE Orders SET client_id = %s, price = %s, date = %s, status = %s WHERE id = %s",
-                            (row_data[0], row_data[1], row_data[2], row_data[3], row_id)
+                            "UPDATE Orders SET price = %s, date = %s, status = %s WHERE id = %s",
+                            (row_data[0], row_data[1], row_data[2], client_id)
                         )
 
                 db.conn.commit()
