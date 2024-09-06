@@ -47,6 +47,7 @@ class SalesWindow(QMainWindow):
         button_layout = QHBoxLayout()
 
         self.delete_button = QPushButton("Удалить товары из заказа")
+        self.delete_button.clicked.connect(self.delete_item)
         button_layout.addWidget(self.delete_button)
 
         self.confirm_button = QPushButton("Подтвердить")
@@ -116,3 +117,14 @@ class SalesWindow(QMainWindow):
                 item = self.table_widget.item(row, col)
                 if item:
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+
+    def delete_item(self):
+        with Database(self.user, self.password) as db:
+            selected_row = self.table_widget.currentRow()
+            if selected_row:
+                id_item = self.table_widget.item(selected_row, 0).text()
+                order_id = self.orders_combo.currentData()
+                db.cursor.execute('DELETE FROM Order_Items WHERE product_id = %s AND order_id = %s', (id_item, order_id,))
+                self.table_widget.removeRow(selected_row)
+                db.conn.commit()
+            QMessageBox.information(self, 'Успех', 'Элемент успешно удалён!')

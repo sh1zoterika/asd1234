@@ -4,12 +4,13 @@ import psycopg2
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
-    QLabel, QLineEdit
+    QLabel, QLineEdit, QDialog
 )
 from PyQt5 import QtCore
 from psycopg2 import OperationalError, sql
 from Database import Database
 from BaseProductWindow import BaseProductWindow
+from EditDialog import EditDialog
 
 
 class AddProductWindow(BaseProductWindow):
@@ -25,6 +26,8 @@ class AddProductWindow(BaseProductWindow):
         headers = ['Товар', 'ID Товара', 'Количество', 'Цена', 'Количество в заказ']
         super().__init__('Добавить товары в заказ', (600, 200, 1000, 600), headers, query, self.user, self.password, parent)
         self.order_id = order_id
+
+        self.order_table.cellDoubleClicked.connect(self.edit_item)
 
         # Кнопка добавления товара в заказ
         self.add_button = QPushButton('Добавить')
@@ -75,3 +78,13 @@ class AddProductWindow(BaseProductWindow):
                 QMessageBox.critical(self, 'Ошибка', f'Ошибка добавления товаров в заказ: {e}')
         else:
             QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите склад.')
+
+    def edit_item(self, row, column):
+        logging.debug(f"Opening EditDialog for row {row}, column {column}")
+        dialog = EditDialog(self.order_table, row, column)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            logging.debug(f"Collected data: {data}")
+            value = QTableWidgetItem(data[0])
+            value.setFlags(value.flags() & ~QtCore.Qt.ItemIsEditable)
+            self.order_table.setItem(row, 0, value)  # Обновляем данные в таблице
