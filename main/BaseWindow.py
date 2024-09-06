@@ -79,6 +79,7 @@ class BaseWindow(QMainWindow):
                 for i, item in enumerate(items):
                     for j, value in enumerate(item):
                         self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
+                self.make_table_read_only()
         except Exception as e:
             logging.error(f"Error loading data: {e}")
             QMessageBox.critical(self, 'Ошибка', f'Ошибка при загрузке данных: {e}')
@@ -135,6 +136,13 @@ class BaseWindow(QMainWindow):
                 db.conn.close()
                 logging.debug("Database connection closed.")
 
+    def make_table_read_only(self):
+        for row in range(self.table_widget.rowCount()):
+            for col in range(self.table_widget.columnCount()):
+                item = self.table_widget.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                    
     def valid(self, new_text, column):
         return True
 

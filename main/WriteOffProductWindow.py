@@ -4,13 +4,15 @@ import psycopg2
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
-    QLabel, QLineEdit
+    QLabel, QLineEdit, QDialog
 )
 from psycopg2 import OperationalError, sql
 from Database import Database
 from BaseProductWindow import BaseProductWindow
+from EditDialog import EditDialog
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 class WriteOffProductWindow(BaseProductWindow):
     def __init__(self, user, password):
@@ -26,6 +28,8 @@ class WriteOffProductWindow(BaseProductWindow):
         }
         headers = ['Имя товара', 'ID товара', 'Количество в наличии', 'Количество списания']
         super().__init__('Списание товаров', (600, 200, 1000, 600), headers, self.query, user, password)
+
+        self.order_table.cellDoubleClicked.connect(self.edit_item)
 
         # Create and configure buttons
         self.writeoff_button = QPushButton('Списать товары')
@@ -84,3 +88,11 @@ class WriteOffProductWindow(BaseProductWindow):
             if db.conn:
                 db.conn.close()
                 logging.debug("Database connection closed.")
+
+    def edit_item(self, row, column):
+        logging.debug(f"Opening EditDialog for row {row}, column {column}")
+        dialog = EditDialog(self.order_table, row, column)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            logging.debug(f"Collected data for update: {data}")
+            self.order_table.setItem(row, 0, QTableWidgetItem(data[0]))  # Обновляем данные в таблице

@@ -11,6 +11,8 @@ from Database import Database
 from BaseWindow import BaseWindow
 from ViewProductWindow import ViewProductWindow
 from EditDialog import EditDialog
+from PyQt5 import QtCore
+
 
 class WarehouseWindow(BaseWindow):
     def __init__(self, user, password):

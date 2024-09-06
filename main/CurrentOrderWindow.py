@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 from psycopg2 import OperationalError, sql
 from Database import Database
 from EditDialog import EditDialog
+from PyQt5 import QtCore
 
 
 class CurrentOrderWindow(QMainWindow):
@@ -72,6 +73,7 @@ class CurrentOrderWindow(QMainWindow):
                 self.table_widget.setItem(i, 2, QTableWidgetItem(str(order[2])))
                 self.table_widget.setItem(i, 3, QTableWidgetItem(order[3].strftime('%Y-%m-%d %H:%M:%S')))
                 self.table_widget.setItem(i, 4, QTableWidgetItem(order[4]))
+            self.make_table_read_only()
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке данных: {e}")
 
@@ -144,3 +146,10 @@ class CurrentOrderWindow(QMainWindow):
                 self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
             self.changes.append(('update', self.table_widget.item(row, 0).text(), data))
             QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
+    
+    def make_table_read_only(self):
+        for row in range(self.table_widget.rowCount()):
+            for col in range(self.table_widget.columnCount()):
+                item = self.table_widget.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)

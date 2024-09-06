@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 )
 from psycopg2 import OperationalError, sql
 from Database import Database
+from PyQt5 import QtCore
 
 
 class ReceivingWindow(QMainWindow):
@@ -146,3 +147,15 @@ class ReceivingWindow(QMainWindow):
                 db.conn.rollback()
             logging.error(f"Error saving changes: {e}")
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
+
+    def make_table_read_only(self):
+        for row in range(self.warehouse_table.rowCount()):
+            for col in range(self.warehouse_table.columnCount()):
+                item = self.warehouse_table.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+        for row in range(self.move_table.rowCount()):
+            for col in range(self.move_table.columnCount()):
+                item = self.move_table.item(row, 0)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)

@@ -10,6 +10,7 @@ from psycopg2 import OperationalError, sql
 from Database import Database
 from BaseWindow import BaseWindow
 from ProductEditDialog import ProductEditDialog
+from PyQt5 import QtCore
 
 
 class ProductWindow(BaseWindow):
@@ -43,6 +44,7 @@ class ProductWindow(BaseWindow):
                 for i, product in enumerate(products):
                     for j, value in enumerate(product):
                         self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
+                self.make_table_read_only()
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при обновлении таблицы: {e}")
 
@@ -129,3 +131,10 @@ class ProductWindow(BaseWindow):
                 self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
             self.changes.append(('update', self.table_widget.item(row, 0).text(), data))
             QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
+
+    def make_table_read_only(self):
+        for row in range(self.table_widget.rowCount()):
+            for col in range(self.table_widget.columnCount()):
+                item = self.table_widget.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
