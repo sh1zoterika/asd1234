@@ -8,134 +8,140 @@ from PyQt5.QtWidgets import (
 )
 from psycopg2 import OperationalError, sql
 from Database import Database
-from BaseWindow import BaseWindow
 
 
-class ReceivingWindow(BaseWindow):
+class ReceivingWindow(QMainWindow):
     def __init__(self, user, password):
         self.user = user
         self.password = password
-        try:
-            with Database(self.user, self.password) as db:
-                self.combo_box = QComboBox()  # Initialize combo_box here
-                column_names = db.get_column_names('productinwarehouse')
-                super().__init__('Приёмка товаров', column_names, self.user, self.password, 'productinwarehouse')
-                self.changes = []  # Для отслеживания изменений
+        super().__init__()
+        self.setWindowTitle('Перемещение товаров')
+        self.setGeometry(600, 200, 800, 600)
 
-                self.load_warehouses()
-                self.combo_box.currentIndexChanged.connect(self.update_table)
+        self.changes = []  # For tracking changes
 
-                # Создаем отдельный layout для combo_box и таблицы
-                combo_table_layout = QVBoxLayout()
-                combo_table_layout.addWidget(self.combo_box)
-                combo_table_layout.addWidget(self.table_widget)
+        layout = QVBoxLayout()
 
-                # Добавляем combo_table_layout в основной layout
-                main_layout = self.centralWidget().layout()
-                main_layout.insertLayout(0, combo_table_layout)  # Добавляем combo_table_layout в основной layout
+        # Layout for combo boxes
+        combo_layout = QHBoxLayout()
 
-                self.update_table()
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при инициализации окна: {e}")
+        # No combo box for right table, only columns
+        # Adding a placeholder for consistency
+        self.to_warehouse_label = QLabel('Склад назначения:')
+        combo_layout.addWidget(self.to_warehouse_label)
 
-    def load_warehouses(self):
-        try:
-            with Database(self.user, self.password) as db:
-                warehouses = db.get_warehouses()
-                for warehouse in warehouses:
-                    self.combo_box.addItem(warehouse[1], warehouse[0])
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке складов: {e}")
+        layout.addLayout(combo_layout)
+
+        # Layout for tables
+        main_layout = QHBoxLayout()
+
+        # Table for products in the selected warehouse
+        self.warehouse_table = QTableWidget()
+        with Database(self.user, self.password) as db:
+            column_names = db.get_column_names('products')
+            self.warehouse_table.setColumnCount(len(column_names))
+            self.warehouse_table.setHorizontalHeaderLabels(column_names)
+        main_layout.addWidget(self.warehouse_table)
+
+        # Table for moving products
+        self.move_table = QTableWidget()
+        self.move_table.setColumnCount(2)
+        self.move_table.setHorizontalHeaderLabels(['Количество', 'Склад назначения'])
+        main_layout.addWidget(self.move_table)
+
+        layout.addLayout(main_layout)
+
+        # Buttons for operations
+        button_layout = QHBoxLayout()
+
+        self.move_button = QPushButton('Переместить')
+        self.move_button.clicked.connect(self.move_products)
+        button_layout.addWidget(self.move_button)
+
+        self.cancel_button = QPushButton('Отменить')
+        self.cancel_button.clicked.connect(self.cancel_changes)
+        button_layout.addWidget(self.cancel_button)
+
+        self.save_button = QPushButton('Сохранить')
+        self.save_button.clicked.connect(self.save_changes)
+        button_layout.addWidget(self.save_button)
+
+        layout.addLayout(button_layout)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
+
+        # Initial load
+        self.update_table()
+
+    def load_warehouses(self, combo_box):
+        with Database(self.user, self.password) as db:
+            warehouses = db.get_warehouses()
+            for warehouse in warehouses:
+                combo_box.addItem(warehouse[1], warehouse[0])
 
     def update_table(self):
-        try:
-            with Database(self.user, self.password) as db:
-                warehouse_id = self.combo_box.currentData()
-                if warehouse_id is not None:
-                    products = db.get_products_by_warehouse(warehouse_id)
-                    self.table_widget.setRowCount(len(products))
-                    self.table_widget.setColumnCount(len(self.table_headers))
-                    self.table_widget.setHorizontalHeaderLabels(self.table_headers)
-                    for i, product in enumerate(products):
-                        self.table_widget.setItem(i, 0, QTableWidgetItem(product[0]))
-                        self.table_widget.setItem(i, 1, QTableWidgetItem(str(product[1])))
-                        self.table_widget.setItem(i, 2, QTableWidgetItem(str(product[2])))
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при обновлении таблицы: {e}")
+        with Database(self.user, self.password) as db:
+            db.cursor.execute("""
+                SELECT *
+                FROM Products""")
+            products = db.cursor.fetchall()
+            self.warehouse_table.setRowCount(len(products))
+            self.move_table.setRowCount(len(products))
+            self.warehouse_table.setColumnCount(len(products[0]))
+            for i, product in enumerate(products):
+                for j in range(len(products[0])):
+                    self.warehouse_table.setItem(i, j, QTableWidgetItem(str(product[j])))
+                    self.move_table.setItem(i, 0, QTableWidgetItem('0'))
+                    to_warehouse_combo = QComboBox()
+                    to_warehouse_combo.addItem("Выберите склад", None)
+                    self.load_warehouses(to_warehouse_combo)
+                    self.move_table.setCellWidget(i, 1, to_warehouse_combo)
+    def move_products(self):
+        for i in range(self.move_table.rowCount()):
+            quantity = int(self.move_table.item(i, 0).text())
+            to_warehouse_combo = self.move_table.cellWidget(i, 1)
+            to_warehouse_id = to_warehouse_combo.currentData()
+            product_id = self.warehouse_table.item(i, 0).text()
+            if quantity > 0 and to_warehouse_id:
+                self.changes.append(('move', to_warehouse_id, product_id, quantity))
+        QMessageBox.information(self, 'Успех', 'Товары подготовлены к перемещению. Нажмите "Сохранить" для подтверждения.')
 
-    def add_item(self):
-        try:
-            row_position = self.table_widget.rowCount()
-            self.table_widget.insertRow(row_position)
-            self.table_widget.setItem(row_position, 0, QTableWidgetItem('Новый товар'))
-            self.table_widget.setItem(row_position, 1, QTableWidgetItem('0'))
-            self.table_widget.setItem(row_position, 2, QTableWidgetItem('0'))
-            self.changes.append(('insert', row_position, ['Новый товар', 0, 0]))
-            QMessageBox.information(self, 'Успех', 'Товар успешно добавлен!')
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при добавлении товара: {e}")
-
-    def delete_item(self):
-        try:
-            selected_row = self.table_widget.currentRow()
-            if selected_row >= 0:
-                self.changes.append(('delete', selected_row, None))
-                self.table_widget.removeRow(selected_row)
-                QMessageBox.information(self, "Успех", "Товар успешно удален!")
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при удалении товара: {e}")
 
     def cancel_changes(self):
-        try:
-            self.update_table()
-            self.changes.clear()
-            QMessageBox.information(self, "Успех", "Изменения успешно отменены!")
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при отмене изменений: {e}")
+        self.update_table()
+        self.changes.clear()
+        QMessageBox.information(self, 'Отменено', 'Изменения отменены!')
 
     def save_changes(self):
         try:
             with Database(self.user, self.password) as db:
-                warehouse_id = self.combo_box.currentData()
-                if warehouse_id is not None:
-                    connection = self.connect_db()
-                    cursor = connection.cursor()
-                    connection.autocommit = False
+                for change in self.changes:
+                    change_type, to_warehouse, product_id, quantity = change
+                    if change_type == 'move':
+                        db.cursor.execute("""
+                            SELECT amount FROM ProductInWarehouse
+                            WHERE warehouse_id = %s AND product_id = %s
+                        """, (to_warehouse, product_id))
+                        result = db.cursor.fetchone()
+                        if result:
+                            db.cursor.execute("""
+                                UPDATE ProductInWarehouse
+                                SET amount = amount + %s
+                                WHERE warehouse_id = %s AND product_id = %s
+                            """, (quantity, to_warehouse, product_id))
+                        else:
+                            db.cursor.execute("""
+                                INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount)
+                                VALUES (%s, %s, %s)
+                            """, (to_warehouse, product_id, quantity))
 
-                    for change in self.changes:
-                        change_type, row_index, row_data = change
-                        if change_type == 'insert':
-                            product_name = row_data[0]
-                            quantity = int(row_data[1])
-                            price = float(row_data[2])
-                            cursor.execute("""
-                                INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price)
-                                VALUES (%s, %s, %s, %s)
-                            """, (warehouse_id, product_name, quantity, price))
-                        elif change_type == 'delete':
-                            product_name = self.table_widget.item(row_index, 0).text()
-                            cursor.execute("""
-                                DELETE FROM ProductInWarehouse
-                                WHERE warehouse_id = %s AND product_name = %s
-                            """, (warehouse_id, product_name))
-
-                    connection.commit()
-                    connection.close()
-                    self.changes.clear()
+                db.conn.commit()
+                self.changes.clear()
                 QMessageBox.information(self, "Успех", "Изменения успешно сохранены!")
         except Exception as e:
-            if connection:
-                connection.rollback()
+            if db.conn:
+                db.conn.rollback()
+            logging.error(f"Error saving changes: {e}")
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
-
-    def get_select_query(self):
-        return "SELECT product_name, amount, price FROM ProductInWarehouse WHERE warehouse_id = %s"
-
-    def get_insert_query(self):
-        return "INSERT INTO ProductInWarehouse (warehouse_id, product_name, amount, price) VALUES (%s, %s, %s, %s)"
-
-    def get_delete_query(self):
-        return "DELETE FROM ProductInWarehouse WHERE warehouse_id = %s AND product_name = %s"
-
-    def get_update_query(self):
-        return "UPDATE ProductInWarehouse SET amount = %s, price = %s WHERE warehouse_id = %s AND product_name = %s"
