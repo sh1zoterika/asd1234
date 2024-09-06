@@ -41,11 +41,6 @@ class AddProductWindow(BaseProductWindow):
                 item = self.warehouse_table.item(row, col)
                 if item:
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
-        for row in range(self.warehouse_table.rowCount()):
-            for col in range(self.warehouse_table.columnCount()):
-                item = self.warehouse_table.item(row, col)
-                if item:
-                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
         for row in range(self.order_table.rowCount()):
             for col in range(self.order_table.columnCount()):
                 item = self.order_table.item(row, col)

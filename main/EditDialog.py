@@ -3,44 +3,67 @@ from PyQt5.QtCore import QDate, QRegExp
 from PyQt5.QtGui import QRegExpValidator
 import logging
 
+
 class EditDialog(QDialog):
-    def __init__(self, table_widget, row=None):
+    def __init__(self, table_widget, row=None, column=None):
         super().__init__()
         self.setWindowTitle("Edit Data")
         self.table_widget = table_widget
         self.row = row
-        
+        self.column = column
+
         layout = QFormLayout()
-        
+
         self.inputs = []
         self.widgets = {}
-        for col in range(table_widget.columnCount()):
-            label = table_widget.horizontalHeaderItem(col).text()
-            if label == 'id':
-                continue  # Пропускаю поле id
+
+        if column is not None:
+            # Создание и настройка виджета только для указанного столбца
+            label = table_widget.horizontalHeaderItem(column).text()
             data_type = self.get_data_type(label)
             widget = self.create_widget(data_type)
+
             if row is not None:
                 if isinstance(widget, QDateEdit):
-                    widget.setDate(QDate.fromString(table_widget.item(row, col).text(), 'yyyy-MM-dd'))
+                    widget.setDate(QDate.fromString(table_widget.item(row, column).text(), 'yyyy-MM-dd'))
                 elif isinstance(widget, QSpinBox):
-                    widget.setValue(int(table_widget.item(row, col).text()))
+                    widget.setValue(int(table_widget.item(row, column).text()))
                 else:
-                    widget.setText(table_widget.item(row, col).text())
+                    widget.setText(table_widget.item(row, column).text())
+
             layout.addRow(label, widget)
             self.inputs.append(widget)
             self.widgets[label] = widget
-        
+        else:
+            # Создание и настройка виджетов для всех столбцов
+            for col in range(table_widget.columnCount()):
+                label = table_widget.horizontalHeaderItem(col).text()
+                if label == 'id':
+                    continue  # Пропускаю поле id
+                data_type = self.get_data_type(label)
+                widget = self.create_widget(data_type)
+                if row is not None:
+                    if isinstance(widget, QDateEdit):
+                        widget.setDate(QDate.fromString(table_widget.item(row, col).text(), 'yyyy-MM-dd'))
+                    elif isinstance(widget, QSpinBox):
+                        widget.setValue(int(table_widget.item(row, col).text()))
+                    else:
+                        widget.setText(table_widget.item(row, col).text())
+
+                layout.addRow(label, widget)
+                self.inputs.append(widget)
+                self.widgets[label] = widget
+
         self.setLayout(layout)
-        
+
         self.accept_button = QPushButton("OK")
         self.accept_button.clicked.connect(self.validate_and_accept)
         layout.addWidget(self.accept_button)
-        
+
         self.reject_button = QPushButton("Cancel")
         self.reject_button.clicked.connect(self.reject)
         layout.addWidget(self.reject_button)
-    
+
     def get_data_type(self, column_name):
         data_types = {
             'id': 'INTEGER',
@@ -66,7 +89,7 @@ class EditDialog(QDialog):
             'order_id': 'INT'
         }
         return data_types.get(column_name, 'VARCHAR')
-    
+
     def create_widget(self, data_type):
         logging.debug(f"Creating widget for data type: {data_type}")
         if data_type == 'DATE' or data_type == 'TIMESTAMP':
@@ -84,7 +107,7 @@ class EditDialog(QDialog):
         else:
             widget = QLineEdit()
         return widget
-    
+
     def get_data(self):
         data = []
         for widget in self.inputs:
@@ -96,14 +119,14 @@ class EditDialog(QDialog):
                 data.append(widget.text())
         logging.debug(f"Collected data: {data}")
         return data
-    
+
     def validate_and_accept(self):
         data = self.get_data()
         if self.validate_data(data):
             self.accept()
         else:
             QMessageBox.critical(self, "Ошибка", "Некорректные данные! Попробуйте еще раз.")
-    
+
     def validate_data(self, data):
         # Проверка на пустые строки и корректность данных
         for item in data:

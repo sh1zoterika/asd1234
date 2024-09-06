@@ -10,6 +10,7 @@ from psycopg2 import OperationalError, sql
 from Database import Database
 from CurrentOrderWindow import CurrentOrderWindow
 from AddProductWindow import AddProductWindow
+from PyQt5 import QtCore
 
 
 class SalesWindow(QMainWindow):
@@ -85,6 +86,7 @@ class SalesWindow(QMainWindow):
                     self.table_widget.setItem(i, 1, QTableWidgetItem(str(name)))
                     self.table_widget.setItem(i, 2, QTableWidgetItem(str(amount)))
                     self.table_widget.setItem(i, 3, QTableWidgetItem(str(price)))
+                self.make_table_read_only()
         except Exception as e:
             print(f"Error updating sales table: {e}")
             QMessageBox.critical(self, "Error", f"Error updating table: {e}")
@@ -107,3 +109,10 @@ class SalesWindow(QMainWindow):
     def save_changes(self):
         # Implement saving changes if needed
         pass
+    
+    def make_table_read_only(self):
+        for row in range(self.table_widget.rowCount()):
+            for col in range(self.table_widget.columnCount()):
+                item = self.table_widget.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)

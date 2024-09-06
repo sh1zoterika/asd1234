@@ -4,10 +4,12 @@ import psycopg2
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
-    QLabel, QLineEdit
+    QLabel, QLineEdit, QDialog
 )
 from psycopg2 import OperationalError, sql
 from Database import Database
+from PyQt5 import QtCore
+from EditDialog import EditDialog
 
 
 class TransferWindow(QMainWindow):
@@ -52,6 +54,7 @@ class TransferWindow(QMainWindow):
         self.move_table.setColumnCount(2)
         self.move_table.setHorizontalHeaderLabels(['Количество', 'Склад назначения'])
         main_layout.addWidget(self.move_table)
+        self.move_table.cellDoubleClicked.connect(self.edit_item)
 
         layout.addLayout(main_layout)
 
@@ -109,6 +112,7 @@ class TransferWindow(QMainWindow):
                     to_warehouse_combo.addItem("Выберите склад", None)
                     self.load_warehouses(to_warehouse_combo)
                     self.move_table.setCellWidget(i, 1, to_warehouse_combo)
+                self.make_table_read_only()
 
     def move_products(self):
         from_warehouse_id = self.from_warehouse_combo_box.currentData()
@@ -169,3 +173,25 @@ class TransferWindow(QMainWindow):
                 db.conn.rollback()
             logging.error(f"Error saving changes: {e}")
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
+
+    def make_table_read_only(self):
+        for row in range(self.warehouse_table.rowCount()):
+            for col in range(self.warehouse_table.columnCount()):
+                item = self.warehouse_table.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+        for row in range(self.move_table.rowCount()):
+            item = self.move_table.item(row, 0)
+            if item:
+                item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+
+    def edit_item(self, row, column):
+        logging.debug(f"Opening EditDialog for row {row}, column {column}")
+        dialog = EditDialog(self.move_table, row, column)
+        if dialog.exec_() == QDialog.Accepted:
+            data = dialog.get_data()
+            for col, value in enumerate(data):
+                item = QTableWidgetItem(value)
+                item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                self.move_table.setItem(row, 0, item)  # Обновляем данные в таблице
+            QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')

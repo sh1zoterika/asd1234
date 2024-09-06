@@ -96,8 +96,8 @@ class ReceivingWindow(QMainWindow):
                     self.move_table.setItem(i, 0, QTableWidgetItem('0'))
                     to_warehouse_combo = QComboBox()
                     to_warehouse_combo.addItem("Выберите склад", None)
-                    self.load_warehouses(to_warehouse_combo)
                     self.move_table.setCellWidget(i, 1, to_warehouse_combo)
+                    self.load_warehouses(to_warehouse_combo)
     def move_products(self):
         for i in range(self.move_table.rowCount()):
             quantity = int(self.move_table.item(i, 0).text())
@@ -117,25 +117,26 @@ class ReceivingWindow(QMainWindow):
     def save_changes(self):
         try:
             with Database(self.user, self.password) as db:
-                for change in self.changes:
-                    change_type, to_warehouse, product_id, quantity = change
-                    if change_type == 'move':
-                        db.cursor.execute("""
-                            SELECT amount FROM ProductInWarehouse
-                            WHERE warehouse_id = %s AND product_id = %s
-                        """, (to_warehouse, product_id))
-                        result = db.cursor.fetchone()
-                        if result:
+                if self.changes():
+                    for change in self.changes:
+                        change_type, to_warehouse, product_id, quantity = change
+                        if change_type == 'move':
                             db.cursor.execute("""
-                                UPDATE ProductInWarehouse
-                                SET amount = amount + %s
+                                SELECT amount FROM ProductInWarehouse
                                 WHERE warehouse_id = %s AND product_id = %s
-                            """, (quantity, to_warehouse, product_id))
-                        else:
-                            db.cursor.execute("""
-                                INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount)
-                                VALUES (%s, %s, %s)
-                            """, (to_warehouse, product_id, quantity))
+                            """, (to_warehouse, product_id))
+                            result = db.cursor.fetchone()
+                            if result:
+                                db.cursor.execute("""
+                                    UPDATE ProductInWarehouse
+                                    SET amount = amount + %s
+                                    WHERE warehouse_id = %s AND product_id = %s
+                                """, (quantity, to_warehouse, product_id))
+                            else:
+                                db.cursor.execute("""
+                                    INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount)
+                                    VALUES (%s, %s, %s)
+                                """, (to_warehouse, product_id, quantity))
 
                 db.conn.commit()
                 self.changes.clear()

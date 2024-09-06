@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
 )
 from psycopg2 import OperationalError, sql
 from Database import Database
+from PyQt5 import QtCore
 
 
 class BaseProductWindow(QMainWindow):
@@ -77,6 +78,7 @@ class BaseProductWindow(QMainWindow):
                     for j, value in enumerate(product):
                         self.warehouse_table.setItem(i, j, QTableWidgetItem(str(value)))
                     self.order_table.setItem(i, 0, QTableWidgetItem('0'))
+                self.make_table_read_only()
             except Exception as e:
                 print(f"Error updating warehouse table: {e}")
                 QMessageBox.critical(self, "Ошибка", f"Ошибка обновления таблицы склада: {e}")
@@ -88,3 +90,14 @@ class BaseProductWindow(QMainWindow):
     #except Exception as e:
     #print(f"Error closing database connection: {e}")
     #event.accept()
+    def make_table_read_only(self):
+        for row in range(self.warehouse_table.rowCount()):
+            for col in range(self.warehouse_table.columnCount()):
+                item = self.warehouse_table.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+        for row in range(self.order_table.rowCount()):
+            for col in range(self.order_table.columnCount()):
+                item = self.order_table.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
