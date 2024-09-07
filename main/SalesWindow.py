@@ -130,12 +130,19 @@ class SalesWindow(QMainWindow):
                 id_item = self.table_widget.item(selected_row, 0).text()
                 order_id = self.orders_combo.currentData()
                 warehouse_id = self.table_widget.item(selected_row, 4).text()
+                amount = self.table_widget.item(selected_row, 3).text()
 
                 # Execute the delete command
                 db.cursor.execute(
                     'DELETE FROM Order_Items WHERE product_id = %s AND order_id = %s AND warehouse_id = %s',
                     (id_item, order_id, warehouse_id))
-
+                db.cursor.execute('SELECT * FROM ProductInWarehouse WHERE product_id = %s and warehouse_id = %s', (id_item, warehouse_id))
+                result = db.cursor.fetchall()
+                if result:
+                    db.cursor.execute('UPDATE ProductInWarehouse SET amount = amount + %s WHERE product_id = %s and warehouse_id = %s',
+                                      (amount, id_item, warehouse_id))
+                else:
+                    db.cursor.execute('INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount) VALUES (%s, %s, %s)', (warehouse_id, id_item, amount))
                 # Check if the delete operation was successful
                 if db.cursor.rowcount > 0:
                     self.table_widget.removeRow(selected_row)
