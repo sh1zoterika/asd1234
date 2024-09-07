@@ -30,7 +30,6 @@ class CurrentOrderWindow(QMainWindow):
 
         self.table_widget = QTableWidget()
         layout.addWidget(self.table_widget)
-        self.table_widget.cellDoubleClicked.connect(self.edit_item)  # Добавляем обработчик двойного клика
 
         button_layout = QHBoxLayout()
 
@@ -96,6 +95,13 @@ class CurrentOrderWindow(QMainWindow):
                 self.make_table_read_only()
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке данных: {e}")
+
+    def make_table_read_only(self):
+        for row in range(self.table_widget.rowCount()):
+            for col in range(self.table_widget.columnCount()):
+                item = self.table_widget.item(row, col)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable & ~QtCore.Qt.ItemIsSelectable)
 
     def add_order(self):
         client_id = self.client_combo.currentData()
@@ -171,10 +177,3 @@ class CurrentOrderWindow(QMainWindow):
                 self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
             self.changes.append(('update', self.table_widget.item(row, 0).text(), data))
             QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
-    
-    def make_table_read_only(self):
-        for row in range(self.table_widget.rowCount()):
-            for col in range(self.table_widget.columnCount()):
-                item = self.table_widget.item(row, col)
-                if item:
-                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
