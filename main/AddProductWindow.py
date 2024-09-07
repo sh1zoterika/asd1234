@@ -21,7 +21,7 @@ class AddProductWindow(BaseProductWindow):
             'select': """SELECT products.name, products.id, amount, products.price FROM ProductInWarehouse
             JOIN Products ON Products.id = ProductInWarehouse.product_id
             WHERE warehouse_id = %s""",
-            'insert': """INSERT INTO Order_items (order_id, product_id, amount, price) VALUES (%s, %s, %s, %s)"""
+            'insert': """INSERT INTO Order_items (order_id, product_id, amount, price, warehouse_id) VALUES (%s, %s, %s, %s, %s)"""
         }
         headers = ['Товар', 'ID Товара', 'Количество', 'Цена', 'Количество в заказ']
         super().__init__('Добавить товары в заказ', (600, 200, 1000, 600), headers, query, self.user, self.password, parent)
@@ -52,6 +52,8 @@ class AddProductWindow(BaseProductWindow):
 
     def add_products_to_order(self):
         self.warehouse_id = self.combo_box.currentData()
+        print(self.warehouse_id)
+        print(self.order_id)
         if self.warehouse_id:
             try:
                 with Database(self.user, self.password) as db:
@@ -65,7 +67,18 @@ class AddProductWindow(BaseProductWindow):
                                 db.cursor.execute(
                                     'UPDATE ProductInWarehouse SET amount = amount - %s WHERE product_id = %s AND warehouse_id = %s',
                                     (quantity, product_id, self.warehouse_id))
-                                db.cursor.execute(self.query['insert'], (self.order_id, product_id, quantity, price))
+                                db.cursor.execute("""SELECT * FROM Order_Items 
+                                                  WHERE product_id = %s AND order_id = %s AND warehouse_id = %s""",
+                                                  (product_id, self.order_id, self.warehouse_id))
+                                result = db.cursor.fetchall()
+                                if result:
+                                    db.cursor.execute("""UPDATE Order_Items SET amount = amount + %s 
+                                                                        WHERE product_id = %s AND order_id = %s AND warehouse_id = %s""",
+                                                      (quantity, product_id, self.order_id, self.warehouse_id))
+                                    db.cursor.execute(self.query['insert'], (self.order_id, product_id, quantity, price, self.warehouse_id))
+                                else:
+                                    db.cursor.execute(self.query['insert'],
+                                                      (self.order_id, product_id, quantity, price, self.warehouse_id))
                             else:
                                 QMessageBox.warning(self, 'Ошибка', 'На складе недостаточно товара')
 
