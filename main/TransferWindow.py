@@ -12,6 +12,20 @@ from PyQt5 import QtCore
 from EditDialog import EditDialog
 
 
+import sys
+import logging
+import psycopg2
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
+    QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
+    QLabel, QSpinBox, QDialog
+)
+from psycopg2 import OperationalError, sql
+from Database import Database
+from PyQt5 import QtCore
+from EditDialog import EditDialog
+
+
 class TransferWindow(QMainWindow):
     def __init__(self, user, password):
         self.user = user
@@ -107,7 +121,9 @@ class TransferWindow(QMainWindow):
                     self.warehouse_table.setItem(i, 2, QTableWidgetItem(str(product[2])))
 
                     # Initialize move_table
-                    self.move_table.setItem(i, 0, QTableWidgetItem('0'))
+                    quantity_spinbox = QSpinBox()
+                    quantity_spinbox.setMaximum(999999999)
+                    self.move_table.setCellWidget(i, 0, quantity_spinbox)
                     to_warehouse_combo = QComboBox()
                     to_warehouse_combo.addItem("Выберите склад", None)
                     self.load_warehouses(to_warehouse_combo)
@@ -118,7 +134,8 @@ class TransferWindow(QMainWindow):
         from_warehouse_id = self.from_warehouse_combo_box.currentData()
         if from_warehouse_id:
             for i in range(self.move_table.rowCount()):
-                quantity = int(self.move_table.item(i, 0).text())
+                quantity_spinbox = self.move_table.cellWidget(i, 0)
+                quantity = quantity_spinbox.value()
                 to_warehouse_combo = self.move_table.cellWidget(i, 1)
                 to_warehouse_id = to_warehouse_combo.currentData()
                 product_id = self.warehouse_table.item(i, 0).text()
@@ -181,9 +198,10 @@ class TransferWindow(QMainWindow):
                 if item:
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
         for row in range(self.move_table.rowCount()):
-            item = self.move_table.item(row, 0)
-            if item:
-                item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+            for col in range(self.move_table.columnCount()):
+                item = self.move_table.item(row, 0)
+                if item:
+                    item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
 
     def edit_item(self, row, column):
         logging.debug(f"Opening EditDialog for row {row}, column {column}")
