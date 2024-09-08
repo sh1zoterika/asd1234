@@ -20,7 +20,7 @@ class EditDialog(QDialog):
         if column is not None:
             label = table_widget.horizontalHeaderItem(column).text()
             data_type = self.get_data_type(label)
-            widget = self.create_widget(data_type)
+            widget = self.create_widget(data_type, label)
 
             if row is not None:
                 if isinstance(widget, QDateEdit):
@@ -39,7 +39,7 @@ class EditDialog(QDialog):
                 if label == 'id':
                     continue
                 data_type = self.get_data_type(label)
-                widget = self.create_widget(data_type)
+                widget = self.create_widget(data_type, label)
                 if row is not None:
                     if isinstance(widget, QDateEdit):
                         widget.setDate(QDate.fromString(table_widget.item(row, col).text(), 'yyyy-MM-dd'))
@@ -79,7 +79,7 @@ class EditDialog(QDialog):
             'amount': 'INT',
             'orders': 'TEXT',
             'info': 'TEXT',
-            'phonenumber': 'VARCHAR',
+            'phonenumber': 'PHONE',
             'client_id': 'INT',
             'price': 'INT',
             'date': 'TIMESTAMP',
@@ -88,7 +88,7 @@ class EditDialog(QDialog):
         }
         return data_types.get(column_name, 'VARCHAR')
 
-    def create_widget(self, data_type):
+    def create_widget(self, data_type, label):
         logging.debug(f"Creating widget for data type: {data_type}")
         if data_type == 'DATE' or data_type == 'TIMESTAMP':
             widget = QDateEdit()
@@ -97,9 +97,14 @@ class EditDialog(QDialog):
         elif data_type == 'INT':
             widget = QSpinBox()
             widget.setMaximum(999999999)
-        elif data_type == 'FLOAT':
+        elif data_type == 'REAL':
             widget = QLineEdit()
             reg_exp = QRegExp(r'^\d+(\.\d{1,4})?$')
+            validator = QRegExpValidator(reg_exp)
+            widget.setValidator(validator)
+        elif data_type == 'PHONE':
+            widget = QLineEdit()
+            reg_exp = QRegExp(r'^\+?\d{10,15}$')  # Регулярное выражение для проверки номера телефона
             validator = QRegExpValidator(reg_exp)
             widget.setValidator(validator)
         else:

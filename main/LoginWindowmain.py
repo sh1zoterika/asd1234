@@ -57,8 +57,6 @@ class LoginWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to open Main Window: {e}")
 
-
-
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     main_window = LoginWindow()

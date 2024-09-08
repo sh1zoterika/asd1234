@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import (
     QLabel, QLineEdit, QDialog
 )
 from psycopg2 import OperationalError, sql
-from BaseWindow import BaseWindow
 from Database import Database
+from BaseWindow import BaseWindow
 from EditDialog import EditDialog  # Импортируем EditDialog
 from ViewOrdersWindow import ViewOrdersWindow
 
@@ -25,7 +25,10 @@ class ClientWindow(BaseWindow):
         layout = self.centralWidget().layout()
         layout.addWidget(self.view_orders_button)
 
-        self.table_widget.cellDoubleClicked.connect(self.edit_item)  # Добавляем обработчик двойного клика
+        self.table_widget.cellDoubleClicked.connect(self.handle_double_click)  # Изменяем обработчик двойного клика
+
+    def handle_double_click(self, row, column):
+        self.edit_item(row, column)
 
     def view_orders(self):
         selected_items = self.table_widget.selectedItems()
@@ -122,10 +125,13 @@ class ClientWindow(BaseWindow):
     def edit_item(self, row, column):
         logging.debug(f"Opening EditDialog for row {row}, column {column}")
         dialog = EditDialog(self.table_widget, row)
-        if dialog.exec_() == QDialog.Accepted:
+        result = dialog.exec_()
+        if result == QDialog.Accepted:
             data = dialog.get_data()
+            logging.debug(f"Collected data for update: {data}")
             for col, value in enumerate(data):
                 self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
-
             self.changes.append(('update', self.table_widget.item(row, 0).text(), data))
             QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
+        elif result == QDialog.Rejected:
+            logging.debug("EditDialog was cancelled.")

@@ -4,7 +4,7 @@ import psycopg2
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
-    QLabel, QLineEdit, QDialog
+    QLabel, QLineEdit, QDialog, QSpinBox
 )
 from psycopg2 import OperationalError, sql
 from Database import Database
@@ -49,6 +49,30 @@ class WriteOffProductWindow(BaseProductWindow):
 
         self.write_off_data = []  # To store write-off data
 
+        self.update_warehouse_table()
+
+    def update_warehouse_table(self):
+        warehouse_id = self.combo_box.currentData()
+        if warehouse_id is not None:
+            try:
+                with Database(self.user, self.password) as db:
+                    db.cursor.execute(self.query['select'], (warehouse_id,))
+                    products = db.cursor.fetchall()
+
+                self.warehouse_table.setRowCount(len(products))
+                self.order_table.setRowCount(len(products))
+
+                for i, product in enumerate(products):
+                    for j, value in enumerate(product):
+                        self.warehouse_table.setItem(i, j, QTableWidgetItem(str(value)))
+                    spin_box = QSpinBox()
+                    spin_box.setMaximum(product[2])  # Устанавливаем максимальное значение равное количеству в наличии
+                    self.order_table.setCellWidget(i, 0, spin_box)
+                self.make_table_read_only()
+            except Exception as e:
+                logging.error(f"Error updating warehouse table: {e}")
+                QMessageBox.critical(self, "Ошибка", f"Ошибка обновления таблицы склада: {e}")
+
     def write_off_products(self):
         self.warehouse_id = self.combo_box.currentData()
         if self.warehouse_id:
@@ -56,7 +80,7 @@ class WriteOffProductWindow(BaseProductWindow):
                 self.write_off_data.clear()  # Clear previous write-off data
                 for i in range(self.warehouse_table.rowCount()):
                     product_id = self.warehouse_table.item(i, 1).text()
-                    write_off_amount = int(self.order_table.item(i, 0).text())
+                    write_off_amount = self.order_table.cellWidget(i, 0).value()
                     if write_off_amount > 0:
                         self.write_off_data.append((write_off_amount, self.warehouse_id, product_id, write_off_amount))
                 QMessageBox.information(self, 'Успех', 'Товары подготовлены к списанию. Нажмите "Сохранить" для подтверждения.')
