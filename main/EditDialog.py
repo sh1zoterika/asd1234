@@ -3,14 +3,14 @@ from PyQt5.QtCore import QDate, QRegExp
 from PyQt5.QtGui import QRegExpValidator
 import logging
 
-
 class EditDialog(QDialog):
-    def __init__(self, table_widget, row=None, column=None):
+    def __init__(self, table_widget, row=None, column=None, max_value=None):
         super().__init__()
         self.setWindowTitle("Edit Data")
         self.table_widget = table_widget
         self.row = row
         self.column = column
+        self.max_value = max_value
 
         layout = QFormLayout()
 
@@ -18,7 +18,6 @@ class EditDialog(QDialog):
         self.widgets = {}
 
         if column is not None:
-            # Создание и настройка виджета только для указанного столбца
             label = table_widget.horizontalHeaderItem(column).text()
             data_type = self.get_data_type(label)
             widget = self.create_widget(data_type)
@@ -35,11 +34,10 @@ class EditDialog(QDialog):
             self.inputs.append(widget)
             self.widgets[label] = widget
         else:
-            # Создание и настройка виджетов для всех столбцов
             for col in range(table_widget.columnCount()):
                 label = table_widget.horizontalHeaderItem(col).text()
                 if label == 'id':
-                    continue  # Пропускаю поле id
+                    continue
                 data_type = self.get_data_type(label)
                 widget = self.create_widget(data_type)
                 if row is not None:
@@ -101,11 +99,13 @@ class EditDialog(QDialog):
             widget.setMaximum(999999999)
         elif data_type == 'FLOAT':
             widget = QLineEdit()
-            reg_exp = QRegExp(r'^\d+(\.\d{1,4})?$')  # Регулярное выражение для проверки ввода с плавающей точкой
+            reg_exp = QRegExp(r'^\d+(\.\d{1,4})?$')
             validator = QRegExpValidator(reg_exp)
-            widget.setValidator(validator)  # Ограничение по символам и только цифры с точкой
+            widget.setValidator(validator)
         else:
             widget = QLineEdit()
+            if self.max_value is not None:
+                widget.setValidator(QRegExpValidator(QRegExp(r'^\d+$')))
         return widget
 
     def get_data(self):
@@ -128,8 +128,10 @@ class EditDialog(QDialog):
             QMessageBox.critical(self, "Ошибка", "Некорректные данные! Попробуйте еще раз.")
 
     def validate_data(self, data):
-        # Проверка на пустые строки и корректность данных
         for item in data:
             if item is None or item.strip() == "":
+                return False
+            if self.max_value is not None and int(item) > self.max_value:
+                QMessageBox.warning(self, "Ошибка", f"Введенное количество превышает доступное на складе ({self.max_value}). Попробуйте еще раз.")
                 return False
         return True

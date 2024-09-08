@@ -17,6 +17,8 @@ class AddProductWindow(BaseProductWindow):
     def __init__(self, order_id, user, password, parent=None):
         self.user = user
         self.password = password
+        self.order_id = order_id
+        self.session_changes = {}  # Для отслеживания изменений в текущей сессии
         query = {
             'select': """SELECT products.name, products.id, amount, products.price FROM ProductInWarehouse
             JOIN Products ON Products.id = ProductInWarehouse.product_id
@@ -25,7 +27,6 @@ class AddProductWindow(BaseProductWindow):
         }
         headers = ['Товар', 'ID Товара', 'Количество', 'Цена', 'Количество в заказ']
         super().__init__('Добавить товары в заказ', (600, 200, 1000, 600), headers, query, self.user, self.password, parent)
-        self.order_id = order_id
 
         self.order_table.cellDoubleClicked.connect(self.edit_item)
 
@@ -52,8 +53,6 @@ class AddProductWindow(BaseProductWindow):
 
     def add_products_to_order(self):
         self.warehouse_id = self.combo_box.currentData()
-        print(self.warehouse_id)
-        print(self.order_id)
         if self.warehouse_id:
             try:
                 with Database(self.user, self.password) as db:
@@ -64,6 +63,12 @@ class AddProductWindow(BaseProductWindow):
                         amount = int(self.warehouse_table.item(i, 2).text())
                         if quantity > 0:
                             if amount >= quantity:
+                                # Обновляем количество в текущей сессии
+                                if product_id in self.session_changes:
+                                    self.session_changes[product_id] += quantity
+                                else:
+                                    self.session_changes[product_id] = quantity
+
                                 db.cursor.execute(
                                     'UPDATE ProductInWarehouse SET amount = amount - %s WHERE product_id = %s AND warehouse_id = %s',
                                     (quantity, product_id, self.warehouse_id))
@@ -75,7 +80,6 @@ class AddProductWindow(BaseProductWindow):
                                     db.cursor.execute("""UPDATE Order_Items SET amount = amount + %s 
                                                                         WHERE product_id = %s AND order_id = %s AND warehouse_id = %s""",
                                                       (quantity, product_id, self.order_id, self.warehouse_id))
-                                    db.cursor.execute(self.query['insert'], (self.order_id, product_id, quantity, price, self.warehouse_id))
                                 else:
                                     db.cursor.execute(self.query['insert'],
                                                       (self.order_id, product_id, quantity, price, self.warehouse_id))
@@ -94,10 +98,54 @@ class AddProductWindow(BaseProductWindow):
 
     def edit_item(self, row, column):
         logging.debug(f"Opening EditDialog for row {row}, column {column}")
-        dialog = EditDialog(self.order_table, row, column)
+        max_value = int(self.warehouse_table.item(row, 2).text())  # Получаем максимальное количество товаров на складе
+        dialog = EditDialog(self.order_table, row, column, max_value)
         if dialog.exec_() == QDialog.Accepted:
             data = dialog.get_data()
             logging.debug(f"Collected data: {data}")
             value = QTableWidgetItem(data[0])
             value.setFlags(value.flags() & ~QtCore.Qt.ItemIsEditable)
             self.order_table.setItem(row, 0, value)  # Обновляем данные в таблице
+
+    def delete_item(self):
+        try:
+            with Database(self.user, self.password) as db:
+                selected_row = self.table_widget.currentRow()
+                if selected_row == -1:
+                    QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите элемент для удаления.')
+                    return
+
+                id_item = self.table_widget.item(selected_row, 0).text()
+                order_id = self.orders_combo.currentData()
+                warehouse_id = self.table_widget.item(selected_row, 4).text()
+                amount = int(self.table_widget.item(selected_row, 3).text())
+
+                # Обновляем количество в текущей сессии
+                if id_item in self.session_changes:
+                    self.session_changes[id_item] -= amount
+                else:
+                    self.session_changes[id_item] = -amount
+
+                # Execute the delete command
+                db.cursor.execute(
+                    'DELETE FROM Order_Items WHERE product_id = %s AND order_id = %s AND warehouse_id = %s',
+                    (id_item, order_id, warehouse_id))
+                db.cursor.execute('SELECT * FROM ProductInWarehouse WHERE product_id = %s and warehouse_id = %s', (id_item, warehouse_id))
+                result = db.cursor.fetchall()
+                if result:
+                    db.cursor.execute('UPDATE ProductInWarehouse SET amount = amount + %s WHERE product_id = %s and warehouse_id = %s',
+                                      (amount, id_item, warehouse_id))
+                else:
+                    db.cursor.execute('INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount) VALUES (%s, %s, %s)', (warehouse_id, id_item, amount))
+                # Check if the delete operation was successful
+                if db.cursor.rowcount > 0:
+                    self.table_widget.removeRow(selected_row)
+                    db.conn.commit()
+                    QMessageBox.information(self, 'Успех', 'Элемент успешно удалён!')
+                else:
+                    QMessageBox.warning(self, 'Ошибка', 'Не удалось удалить элемент. Возможно, он не существует.')
+
+        except Exception as e:
+            # Roll back in case of error
+            db.conn.rollback()
+            QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка: {e}')
