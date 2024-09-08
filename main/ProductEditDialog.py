@@ -7,7 +7,7 @@ import logging
 class ProductEditDialog(QDialog):
     def __init__(self, table_widget, row=None):
         super().__init__()
-        self.setWindowTitle("Edit Product Data")
+        self.setWindowTitle("Изменение данных о товаре")
         self.table_widget = table_widget
         self.row = row
         
@@ -20,7 +20,7 @@ class ProductEditDialog(QDialog):
             if label == 'id':
                 continue  # Пропускаю поле id
             data_type = self.get_data_type(label)
-            widget = self.create_widget(data_type)
+            widget = self.create_widget(data_type, label)
             if row is not None:
                 if isinstance(widget, QDateEdit):
                     widget.setDate(QDate.fromString(table_widget.item(row, col).text(), 'yyyy-MM-dd'))
@@ -38,7 +38,7 @@ class ProductEditDialog(QDialog):
         self.accept_button.clicked.connect(self.validate_and_accept)
         layout.addWidget(self.accept_button)
         
-        self.reject_button = QPushButton("Cancel")
+        self.reject_button = QPushButton("Отмена")
         self.reject_button.clicked.connect(self.reject)
         layout.addWidget(self.reject_button)
     
@@ -50,11 +50,12 @@ class ProductEditDialog(QDialog):
             'lifetime': 'INT',
             'description': 'TEXT',
             'category': 'VARCHAR',
-            'png_url': 'BYTEA'
+            'png_url': 'BYTEA',
+            'price': 'REAL'
         }
         return data_types.get(column_name, 'VARCHAR')
     
-    def create_widget(self, data_type):
+    def create_widget(self, data_type, label):
         logging.debug(f"Creating widget for data type: {data_type}")
         if data_type == 'DATE' or data_type == 'TIMESTAMP':
             widget = QDateEdit()
@@ -63,11 +64,16 @@ class ProductEditDialog(QDialog):
         elif data_type == 'INT':
             widget = QSpinBox()
             widget.setMaximum(999999999)
-        elif data_type == 'FLOAT':
+        elif data_type == 'REAL':
             widget = QLineEdit()
             reg_exp = QRegExp(r'^\d+(\.\d{1,4})?$')  # Регулярное выражение для проверки ввода с плавающей точкой
             validator = QRegExpValidator(reg_exp)
             widget.setValidator(validator)  # Ограничение по символам и только цифры с точкой
+        elif data_type == 'VARCHAR' and label == 'article':
+            widget = QLineEdit()
+            reg_exp = QRegExp(r'^\d+$')  # Регулярное выражение для проверки ввода только цифр
+            validator = QRegExpValidator(reg_exp)
+            widget.setValidator(validator)  # Ограничение по символам и только цифры
         else:
             widget = QLineEdit()
         return widget
