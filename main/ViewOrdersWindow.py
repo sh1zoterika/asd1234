@@ -1,0 +1,46 @@
+import sys
+import logging
+import psycopg2
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QMessageBox, QWidget
+)
+from PyQt5 import QtCore
+from Database import Database
+
+class ViewOrdersWindow(QDialog):
+    def __init__(self, user, password, client_id):
+        super().__init__()
+        self.user = user
+        self.password = password
+        self.client_id = client_id
+
+        self.setWindowTitle("Заказы клиента")
+        self.setGeometry(400, 200, 600, 400)
+
+        layout = QVBoxLayout()
+        self.table_widget = QTableWidget()
+        layout.addWidget(self.table_widget)
+        self.setLayout(layout)
+
+        self.load_orders()
+
+    def load_orders(self):
+        try:
+            with Database(self.user, self.password) as db:
+                db.cursor.execute("""
+                    SELECT id, price, date, status
+                    FROM Orders
+                    WHERE client_id = %s
+                """, (self.client_id,))
+                orders = db.cursor.fetchall()
+                self.table_widget.setRowCount(len(orders))
+                self.table_widget.setColumnCount(4)
+                self.table_widget.setHorizontalHeaderLabels(["ID", "Цена", "Дата", "Статус"])
+                for i, order in enumerate(orders):
+                    for j, value in enumerate(order):
+                        item = QTableWidgetItem(str(value))
+                        item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+                        self.table_widget.setItem(i, j, item)
+        except Exception as e:
+            logging.error(f"Error loading orders: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке заказов: {e}")

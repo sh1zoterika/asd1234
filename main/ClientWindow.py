@@ -10,6 +10,7 @@ from psycopg2 import OperationalError, sql
 from BaseWindow import BaseWindow
 from Database import Database
 from EditDialog import EditDialog  # Импортируем EditDialog
+from ViewOrdersWindow import ViewOrdersWindow
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -27,7 +28,15 @@ class ClientWindow(BaseWindow):
         self.table_widget.cellDoubleClicked.connect(self.edit_item)  # Добавляем обработчик двойного клика
 
     def view_orders(self):
-        pass
+        selected_items = self.table_widget.selectedItems()
+        if selected_items:
+            first_item = selected_items[0]
+            row = first_item.row()
+            client_id = self.table_widget.item(row, 0).text()
+            view_orders_window = ViewOrdersWindow(self.user, self.password, client_id)
+            view_orders_window.exec_()
+        else:
+            QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите клиента.')
 
     def get_select_query(self):
         return """
