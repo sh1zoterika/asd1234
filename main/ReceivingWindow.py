@@ -76,13 +76,13 @@ class ReceivingWindow(QMainWindow):
         # Initial load
         self.update_table()
 
-    def load_warehouses(self, combo_box):
+    def load_warehouses(self):
         with Database(self.user, self.password) as db:
             warehouses = db.get_warehouses()
-            for warehouse in warehouses:
-                combo_box.addItem(warehouse[1], warehouse[0])
+            return [(warehouse[1], warehouse[0]) for warehouse in warehouses]
 
     def update_table(self):
+        warehouses = self.load_warehouses()
         with Database(self.user, self.password) as db:
             db.cursor.execute("""
                 SELECT *
@@ -94,11 +94,13 @@ class ReceivingWindow(QMainWindow):
             for i, product in enumerate(products):
                 for j in range(len(products[0])):
                     self.warehouse_table.setItem(i, j, QTableWidgetItem(str(product[j])))
-                    self.move_table.setItem(i, 0, QTableWidgetItem('0'))
-                    to_warehouse_combo = QComboBox()
-                    to_warehouse_combo.addItem("Выберите склад", None)
-                    self.move_table.setCellWidget(i, 1, to_warehouse_combo)
-                    self.load_warehouses(to_warehouse_combo)
+                self.move_table.setItem(i, 0, QTableWidgetItem('0'))
+                to_warehouse_combo = QComboBox()
+                to_warehouse_combo.addItem("Выберите склад", None)
+                for name, id in warehouses:
+                    to_warehouse_combo.addItem(name, id)
+                self.move_table.setCellWidget(i, 1, to_warehouse_combo)
+
     def move_products(self):
         for i in range(self.move_table.rowCount()):
             quantity = int(self.move_table.item(i, 0).text())
@@ -107,8 +109,7 @@ class ReceivingWindow(QMainWindow):
             product_id = self.warehouse_table.item(i, 0).text()
             if quantity > 0 and to_warehouse_id:
                 self.changes.append(('move', to_warehouse_id, product_id, quantity))
-        QMessageBox.information(self, 'Успех', 'Товары подготовлены к перемещению. Нажмите "Сохранить" для подтверждения.')
-
+        QMessageBox.information(self, 'Успех', 'Товары подготовлены к приёмке. Нажмите "Сохранить" для подтверждения.')
 
     def cancel_changes(self):
         self.update_table()
@@ -118,7 +119,7 @@ class ReceivingWindow(QMainWindow):
     def save_changes(self):
         try:
             with Database(self.user, self.password) as db:
-                if self.changes():
+                if self.changes:
                     for change in self.changes:
                         change_type, to_warehouse, product_id, quantity = change
                         if change_type == 'move':
