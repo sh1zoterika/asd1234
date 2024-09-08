@@ -21,6 +21,7 @@ class SalesWindow(QMainWindow):
         self.setWindowTitle("Продажа товаров")
         self.setGeometry(600, 200, 800, 600)
 
+        self.changes = []  # Для отслеживания изменений
 
         layout = QVBoxLayout()
 
@@ -51,6 +52,7 @@ class SalesWindow(QMainWindow):
         button_layout.addWidget(self.delete_button)
 
         self.confirm_button = QPushButton("Подтвердить")
+        self.confirm_button.clicked.connect(self.save_changes)
         button_layout.addWidget(self.confirm_button)
 
         layout.addLayout(button_layout)
@@ -109,9 +111,29 @@ class SalesWindow(QMainWindow):
             QMessageBox.critical(self, 'Error', f'Error opening add product window: {e}')
 
     def save_changes(self):
-        # Implement saving changes if needed
-        pass
-    
+        try:
+            with Database(self.user, self.password) as db:
+                for change in self.changes:
+                    change_type, product_id, order_id, warehouse_id, amount = change
+                    if change_type == 'delete':
+                        db.cursor.execute(
+                            'DELETE FROM Order_Items WHERE product_id = %s AND order_id = %s AND warehouse_id = %s',
+                            (product_id, order_id, warehouse_id))
+                        db.cursor.execute('SELECT * FROM ProductInWarehouse WHERE product_id = %s and warehouse_id = %s', (product_id, warehouse_id))
+                        result = db.cursor.fetchall()
+                        if result:
+                            db.cursor.execute('UPDATE ProductInWarehouse SET amount = amount + %s WHERE product_id = %s and warehouse_id = %s',
+                                              (amount, product_id, warehouse_id))
+                        else:
+                            db.cursor.execute('INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount) VALUES (%s, %s, %s)', (warehouse_id, product_id, amount))
+                db.conn.commit()
+                self.changes.clear()
+                QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
+        except Exception as e:
+            if db.conn:
+                db.conn.rollback()
+            QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при сохранении: {e}')
+
     def make_table_read_only(self):
         for row in range(self.table_widget.rowCount()):
             for col in range(self.table_widget.columnCount()):
@@ -120,38 +142,16 @@ class SalesWindow(QMainWindow):
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
 
     def delete_item(self):
-        try:
-            with Database(self.user, self.password) as db:
-                selected_row = self.table_widget.currentRow()
-                if selected_row == -1:
-                    QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите элемент для удаления.')
-                    return
+        selected_row = self.table_widget.currentRow()
+        if selected_row == -1:
+            QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите элемент для удаления.')
+            return
 
-                id_item = self.table_widget.item(selected_row, 0).text()
-                order_id = self.orders_combo.currentData()
-                warehouse_id = self.table_widget.item(selected_row, 4).text()
-                amount = self.table_widget.item(selected_row, 3).text()
+        id_item = self.table_widget.item(selected_row, 0).text()
+        order_id = self.orders_combo.currentData()
+        warehouse_id = self.table_widget.item(selected_row, 4).text()
+        amount = int(self.table_widget.item(selected_row, 2).text())
 
-                # Execute the delete command
-                db.cursor.execute(
-                    'DELETE FROM Order_Items WHERE product_id = %s AND order_id = %s AND warehouse_id = %s',
-                    (id_item, order_id, warehouse_id))
-                db.cursor.execute('SELECT * FROM ProductInWarehouse WHERE product_id = %s and warehouse_id = %s', (id_item, warehouse_id))
-                result = db.cursor.fetchall()
-                if result:
-                    db.cursor.execute('UPDATE ProductInWarehouse SET amount = amount + %s WHERE product_id = %s and warehouse_id = %s',
-                                      (amount, id_item, warehouse_id))
-                else:
-                    db.cursor.execute('INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount) VALUES (%s, %s, %s)', (warehouse_id, id_item, amount))
-                # Check if the delete operation was successful
-                if db.cursor.rowcount > 0:
-                    self.table_widget.removeRow(selected_row)
-                    db.conn.commit()
-                    QMessageBox.information(self, 'Успех', 'Элемент успешно удалён!')
-                else:
-                    QMessageBox.warning(self, 'Ошибка', 'Не удалось удалить элемент. Возможно, он не существует.')
-
-        except Exception as e:
-            # Roll back in case of error
-            db.conn.rollback()
-            QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка: {e}')
+        self.changes.append(('delete', id_item, order_id, warehouse_id, amount))
+        self.table_widget.removeRow(selected_row)
+        QMessageBox.information(self, 'Успех', 'Элемент подготовлен к удалению. Нажмите "Подтвердить" для сохранения изменений.')
