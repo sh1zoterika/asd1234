@@ -4,7 +4,7 @@ import psycopg2
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
-    QLabel, QLineEdit
+    QLabel, QSpinBox
 )
 from psycopg2 import OperationalError, sql
 from Database import Database
@@ -16,22 +16,12 @@ class ReceivingWindow(QMainWindow):
         self.user = user
         self.password = password
         super().__init__()
-        self.setWindowTitle('Перемещение товаров')
+        self.setWindowTitle('Приёмка товаров')
         self.setGeometry(600, 200, 800, 600)
 
         self.changes = []  # For tracking changes
 
         layout = QVBoxLayout()
-
-        # Layout for combo boxes
-        combo_layout = QHBoxLayout()
-
-        # No combo box for right table, only columns
-        # Adding a placeholder for consistency
-        self.to_warehouse_label = QLabel('Склад назначения:')
-        combo_layout.addWidget(self.to_warehouse_label)
-
-        layout.addLayout(combo_layout)
 
         # Layout for tables
         main_layout = QHBoxLayout()
@@ -55,7 +45,7 @@ class ReceivingWindow(QMainWindow):
         # Buttons for operations
         button_layout = QHBoxLayout()
 
-        self.move_button = QPushButton('Переместить')
+        self.move_button = QPushButton('Принять')
         self.move_button.clicked.connect(self.move_products)
         button_layout.addWidget(self.move_button)
 
@@ -94,7 +84,9 @@ class ReceivingWindow(QMainWindow):
             for i, product in enumerate(products):
                 for j in range(len(products[0])):
                     self.warehouse_table.setItem(i, j, QTableWidgetItem(str(product[j])))
-                self.move_table.setItem(i, 0, QTableWidgetItem('0'))
+                quantity_spinbox = QSpinBox()
+                quantity_spinbox.setMaximum(999999999)
+                self.move_table.setCellWidget(i, 0, quantity_spinbox)
                 to_warehouse_combo = QComboBox()
                 to_warehouse_combo.addItem("Выберите склад", None)
                 for name, id in warehouses:
@@ -103,7 +95,8 @@ class ReceivingWindow(QMainWindow):
 
     def move_products(self):
         for i in range(self.move_table.rowCount()):
-            quantity = int(self.move_table.item(i, 0).text())
+            quantity_spinbox = self.move_table.cellWidget(i, 0)
+            quantity = quantity_spinbox.value()
             to_warehouse_combo = self.move_table.cellWidget(i, 1)
             to_warehouse_id = to_warehouse_combo.currentData()
             product_id = self.warehouse_table.item(i, 0).text()
