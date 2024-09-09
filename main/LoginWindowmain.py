@@ -4,7 +4,7 @@ import psycopg2
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
-    QLabel, QLineEdit,
+    QLabel, QLineEdit
 )
 from PyQt5.QtCore import pyqtSignal
 from psycopg2 import OperationalError, sql

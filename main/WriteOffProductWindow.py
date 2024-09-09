@@ -66,7 +66,7 @@ class WriteOffProductWindow(BaseProductWindow):
                     for j, value in enumerate(product):
                         self.warehouse_table.setItem(i, j, QTableWidgetItem(str(value)))
                     spin_box = QSpinBox()
-                    spin_box.setMaximum(product[2])  # Устанавливаем максимальное значение равное количеству в наличии
+                    spin_box.setMaximum(999999999)  # Устанавливаем большое максимальное значение
                     self.order_table.setCellWidget(i, 0, spin_box)
                 self.make_table_read_only()
             except Exception as e:
@@ -81,9 +81,16 @@ class WriteOffProductWindow(BaseProductWindow):
                 for i in range(self.warehouse_table.rowCount()):
                     product_id = self.warehouse_table.item(i, 1).text()
                     write_off_amount = self.order_table.cellWidget(i, 0).value()
-                    if write_off_amount > 0:
+                    available_amount = int(self.warehouse_table.item(i, 2).text())
+                    if write_off_amount > available_amount:
+                        QMessageBox.warning(self, 'Ошибка', f'Недостаточно товара на складе для списания {write_off_amount} единиц. Доступно: {available_amount} единиц.')
+                    elif write_off_amount > 0:
                         self.write_off_data.append((write_off_amount, self.warehouse_id, product_id, write_off_amount))
-                QMessageBox.information(self, 'Успех', 'Товары подготовлены к списанию. Нажмите "Сохранить" для подтверждения.')
+                if self.write_off_data:
+                    QMessageBox.information(self, 'Успех', 'Товары подготовлены к списанию. Нажмите "Сохранить" для подтверждения.')
+            except ValueError as ve:
+                logging.error(f"ValueError: {ve}")
+                QMessageBox.critical(self, 'Ошибка', f'Ошибка подготовки данных для списания: {ve}')
             except Exception as e:
                 logging.error(f"Error preparing write-off data: {e}")
                 QMessageBox.critical(self, 'Ошибка', f'Ошибка подготовки данных для списания: {e}')
@@ -103,6 +110,9 @@ class WriteOffProductWindow(BaseProductWindow):
                 db.conn.commit()
                 self.write_off_data.clear()
                 QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
+        except OperationalError as oe:
+            logging.error(f"OperationalError: {oe}")
+            QMessageBox.critical(self, 'Ошибка', f'Ошибка сохранения изменений: {oe}')
         except Exception as e:
             if db.conn:
                 db.conn.rollback()
