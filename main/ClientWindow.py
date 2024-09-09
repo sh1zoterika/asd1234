@@ -25,11 +25,6 @@ class ClientWindow(BaseWindow):
         layout = self.centralWidget().layout()
         layout.addWidget(self.view_orders_button)
 
-        self.table_widget.cellDoubleClicked.connect(self.handle_double_click)  # Изменяем обработчик двойного клика
-
-    def handle_double_click(self, row, column):
-        self.edit_item(row, column)
-
     def view_orders(self):
         selected_items = self.table_widget.selectedItems()
         if selected_items:

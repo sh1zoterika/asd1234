@@ -56,16 +56,21 @@ class BaseWindow(QMainWindow):
         self.update_table()
         self.changes = []  # Для отслеживания изменений
 
+        self.dialog_open = False  # Флаг для отслеживания открытого диалогового окна
+
     def edit_item(self, row, column):
-        logging.debug(f"Opening EditDialog for row {row}, column {column}")
-        dialog = EditDialog(self.table_widget, row)
-        if dialog.exec_() == QDialog.Accepted:
-            data = dialog.get_data()
-            logging.debug(f"Collected data: {data}")
-            for col, value in enumerate(data):
-                self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
-            self.changes.append(('update', row, data))
-            QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
+        if not self.dialog_open:  # Проверяем, открыто ли уже диалоговое окно
+            self.dialog_open = True  # Устанавливаем флаг в True
+            logging.debug(f"Opening EditDialog for row {row}, column {column}")
+            dialog = EditDialog(self.table_widget, row)
+            if dialog.exec_() == QDialog.Accepted:
+                data = dialog.get_data()
+                logging.debug(f"Collected data: {data}")
+                for col, value in enumerate(data):
+                    self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
+                self.changes.append(('update', row, data))
+                QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
+            self.dialog_open = False  # Сбрасываем флаг после закрытия диалогового окна
 
     def update_table(self):
         try:
