@@ -10,6 +10,7 @@ from psycopg2 import OperationalError, sql
 from Database import Database
 from BaseProductWindow import BaseProductWindow
 from EditDialog import EditDialog
+from documentcreator import DocumentCreator
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -107,6 +108,14 @@ class WriteOffProductWindow(BaseProductWindow):
             with Database(self.user, self.password) as db:
                 for write_off_amount, warehouse_id, product_id, _ in self.write_off_data:
                     db.cursor.execute(self.query['insert'], (write_off_amount, warehouse_id, product_id, write_off_amount))
+                    db.cursor.execute('SELECT name FROM Products WHERE id = %s', (product_id,))
+                    product_name = db.cursor.fetchone()
+                    data = {'{warehouse_id}': str(warehouse_id),
+                            '{product_id}': str(product_id),
+                            '{product_name}': str(product_name[0]),
+                            '{amount}': str(write_off_amount)}
+                    doc = DocumentCreator('writeoffpreset.docx', data)
+                    doc.exec_()
                 db.conn.commit()
                 self.write_off_data.clear()
                 QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')

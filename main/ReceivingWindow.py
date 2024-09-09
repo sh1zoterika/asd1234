@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
 from psycopg2 import OperationalError, sql
 from Database import Database
 from PyQt5 import QtCore
-
+from documentcreator import DocumentCreator
 
 class ReceivingWindow(QMainWindow):
     def __init__(self, user, password):
@@ -132,6 +132,21 @@ class ReceivingWindow(QMainWindow):
                                     INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount)
                                     VALUES (%s, %s, %s)
                                 """, (to_warehouse, product_id, quantity))
+                            db.cursor.execute('''SELECT name, article, lifetime, description, category, price 
+                            FROM Products 
+                            WHERE ID = %s''', (product_id))
+                            res = db.cursor.fetchone()
+                            data = {'{warehouse_id}': str(to_warehouse),
+                                    '{name}': str(res[0]),
+                                    '{art}': str(res[1]),
+                                    '{lifetime}': str(res[2]),
+                                    '{description}': str(res[3]),
+                                    '{category}': str(res[4]),
+                                    '{price}': str(res[5]),
+                                    '{amount}': str(quantity)}
+                            doc = DocumentCreator('receivingpreset.docx', data)
+                            doc.exec_()
+
 
                 db.conn.commit()
                 self.changes.clear()

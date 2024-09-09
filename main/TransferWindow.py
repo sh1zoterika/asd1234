@@ -24,6 +24,7 @@ from psycopg2 import OperationalError, sql
 from Database import Database
 from PyQt5 import QtCore
 from EditDialog import EditDialog
+from documentcreator import DocumentCreator
 
 
 class TransferWindow(QMainWindow):
@@ -181,6 +182,15 @@ class TransferWindow(QMainWindow):
                                 INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount)
                                 VALUES (%s, %s, %s)
                             """, (to_warehouse, product_id, quantity))
+                        db.cursor.execute('SELECT name FROM PRODUCTS WHERE id = %s', (product_id,))
+                        product_name = db.cursor.fetchone()
+                        data = {'{from_warehouse}': str(from_warehouse),
+                        '{to_warehouse}': str(to_warehouse),
+                        '{product_name}': str(product_name[0]),
+                        '{product_id}': str(product_id),
+                        '{amount}': str(quantity)}
+                        doc = DocumentCreator('transferpreset.docx', data)
+                        doc.exec_()
 
                 db.conn.commit()
                 self.changes.clear()

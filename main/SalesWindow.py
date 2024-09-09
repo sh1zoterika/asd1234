@@ -11,6 +11,7 @@ from Database import Database
 from CurrentOrderWindow import CurrentOrderWindow
 from AddProductWindow import AddProductWindow
 from PyQt5 import QtCore
+from documentcreator import DocumentCreator
 
 
 class SalesWindow(QMainWindow):
@@ -126,6 +127,15 @@ class SalesWindow(QMainWindow):
                                               (amount, product_id, warehouse_id))
                         else:
                             db.cursor.execute('INSERT INTO ProductInWarehouse (warehouse_id, product_id, amount) VALUES (%s, %s, %s)', (warehouse_id, product_id, amount))
+                for i in range(self.table_widget.rowCount()):
+                    data = {'{order_id}':str(self.orders_combo.currentData()),
+                    '{product_id}':str(self.table_widget.item(i, 0).text()),
+                    '{product_name}':str(self.table_widget.item(i, 1).text()),
+                    '{amount}':str(self.table_widget.item(i, 2).text()),
+                    '{price}':str(self.table_widget.item(i, 3).text()),
+                    '{warehouse_id}':str(self.table_widget.item(i, 4).text())}
+                    doc = DocumentCreator('salespreset.docx', data)
+                    doc.exec_()
                 db.conn.commit()
                 self.changes.clear()
                 QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')
