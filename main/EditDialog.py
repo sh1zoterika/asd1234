@@ -73,7 +73,7 @@ class EditDialog(QDialog):
             'png_url': 'BYTEA',
             'address': 'VARCHAR',
             'geo_text': 'TEXT',
-            'geo_coordinates': 'VARCHAR',
+            'geo_coordinates': 'GEO_COORDINATES',
             'warehouse_id': 'INT',
             'product_id': 'INT',
             'amount': 'INT',
@@ -105,6 +105,11 @@ class EditDialog(QDialog):
         elif data_type == 'PHONE':
             widget = QLineEdit()
             reg_exp = QRegExp(r'^\+?\d{10,15}$')  # Регулярное выражение для проверки номера телефона
+            validator = QRegExpValidator(reg_exp)
+            widget.setValidator(validator)
+        elif data_type == 'GEO_COORDINATES':
+            widget = QLineEdit()
+            reg_exp = QRegExp(r'^-?\d{1,3}\.\d{1,6},\s*-?\d{1,3}\.\d{1,6}$')  # Регулярное выражение для проверки координат
             validator = QRegExpValidator(reg_exp)
             widget.setValidator(validator)
         else:
