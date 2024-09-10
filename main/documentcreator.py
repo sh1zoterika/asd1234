@@ -14,7 +14,7 @@ class DocumentCreator(QDialog):
 
         # Создание виджетов
         self.message_label = QLabel(
-            f"Вы хотите напечатать документы?\n\nШаблон: {self.template_name}\nДанные: {self.data}")
+            f"Вы хотите напечатать документы?") #ОТЛАДКА: \n\nШаблон: {self.template_name}\nДанные: {self.data}
 
         self.yes_button = QPushButton("Да")
         self.no_button = QPushButton("Нет")
@@ -33,7 +33,11 @@ class DocumentCreator(QDialog):
 
     def fill_template(self):
         # Открываем шаблон документа
-        doc = Document(self.template_name)
+        template_folder = 'presets'
+
+        # Формируем полный путь к шаблону
+        template_path = os.path.join(template_folder, self.template_name)
+        doc = Document(template_path)
 
         # Проходим по всем параграфам в документе
         for paragraph in doc.paragraphs:
@@ -61,10 +65,8 @@ class DocumentCreator(QDialog):
 
     def open_file(self, path):
         try:
-            if os.name == 'nt':  # Для Windows
+            if os.name == 'nt':
                 os.startfile(path)
-            elif os.name == 'posix':  # Для Unix-подобных систем
-                subprocess.call(['xdg-open', path])
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось открыть файл: {e}")
 
