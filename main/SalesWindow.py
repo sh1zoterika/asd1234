@@ -14,6 +14,7 @@ from PyQt5 import QtCore
 from documentcreator import DocumentCreator
 
 
+
 class SalesWindow(QMainWindow):
     def __init__(self, user=None, password=None, parent=None):
         self.user = user
@@ -40,6 +41,17 @@ class SalesWindow(QMainWindow):
         self.add_button = QPushButton("Добавить товары")
         self.add_button.clicked.connect(self.open_add_product_window)
         layout.addWidget(self.add_button)
+
+        # Search section
+        search_layout = QHBoxLayout()
+        self.search_label = QLabel("Поиск товара:")
+        search_layout.addWidget(self.search_label)
+        self.search_box = QLineEdit()
+        search_layout.addWidget(self.search_box)
+        self.search_button = QPushButton("Поиск")
+        self.search_button.clicked.connect(self.search_items)
+        search_layout.addWidget(self.search_button)
+        layout.addLayout(search_layout)
 
         # Таблица для отображения товаров в заказе
         self.table_widget = QTableWidget()
@@ -165,3 +177,32 @@ class SalesWindow(QMainWindow):
         self.changes.append(('delete', id_item, order_id, warehouse_id, amount))
         self.table_widget.removeRow(selected_row)
         QMessageBox.information(self, 'Успех', 'Элемент подготовлен к удалению. Нажмите "Подтвердить" для сохранения изменений.')
+
+    def search_items(self):
+        search_text = self.search_box.text().lower()  # Получение текста из поля ввода
+        order_id = self.orders_combo.currentData()
+
+        try:
+            with Database(self.user, self.password) as db:
+                db.cursor.execute("""
+                SELECT p.id, p.name, oi.amount, oi.price, oi.warehouse_id
+                FROM Order_items oi 
+                JOIN Products p ON oi.product_id = p.id 
+                WHERE oi.order_id = %s AND LOWER(p.name) LIKE %s
+                """, (order_id, '%' + search_text + '%'))
+                products = db.cursor.fetchall()
+
+                self.table_widget.setRowCount(len(products))
+                self.table_widget.setColumnCount(
+                    5)  # Установите количество столбцов, соответствующее вашему шаблону таблицы
+
+                headers = ['Product ID', 'Product Name', 'Amount', 'Price', 'Warehouse ID']
+                self.table_widget.setHorizontalHeaderLabels(headers)
+
+                for i, product in enumerate(products):
+                    for j in range(len(product)):
+                        self.table_widget.setItem(i, j, QTableWidgetItem(str(product[j])))
+
+                self.make_table_read_only()  # Делает таблицу доступной только для чтения
+        except Exception as e:
+            QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка при поиске: {e}')

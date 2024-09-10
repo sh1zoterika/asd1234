@@ -6,10 +6,9 @@ from PyQt5.QtWidgets import (
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
     QLabel, QLineEdit
 )
+from PyQt5 import QtCore
 from psycopg2 import OperationalError, sql
 from Database import Database
-from PyQt5 import QtCore
-
 
 class BaseProductWindow(QMainWindow):
     def __init__(self, title, geometry, headers, query, user=None, password=None, parent=None):
@@ -29,6 +28,18 @@ class BaseProductWindow(QMainWindow):
         self.load_warehouses()
         self.combo_box.currentIndexChanged.connect(self.update_warehouse_table)
         layout.addWidget(self.combo_box)
+
+        # Создание элементов поиска
+        search_layout = QHBoxLayout()
+        self.search_label = QLabel('Поиск:')
+        search_layout.addWidget(self.search_label)
+        self.search_box = QLineEdit()
+        search_layout.addWidget(self.search_box)
+        self.search_button = QPushButton('Поиск')
+        self.search_button.clicked.connect(self.search_products)
+        search_layout.addWidget(self.search_button)
+
+        layout.addLayout(search_layout)  # Добавление layout поиска в основной layout
 
         # Горизонтальный слой для двух таблиц
         tables_layout = QHBoxLayout()
@@ -83,13 +94,27 @@ class BaseProductWindow(QMainWindow):
                 print(f"Error updating warehouse table: {e}")
                 QMessageBox.critical(self, "Ошибка", f"Ошибка обновления таблицы склада: {e}")
 
-    #def closeEvent(self, event):      ************
-    #print(f"Closing {self.windowTitle()}...")
-    #try:
-    #    self.db.close()
-    #except Exception as e:
-    #print(f"Error closing database connection: {e}")
-    #event.accept()
+    def search_products(self):
+        search_text = self.search_box.text().lower()  # Получаем текст из поля поиска
+        warehouse_id = self.combo_box.currentData()
+        if warehouse_id:
+            try:
+                with Database(self.user, self.password) as db:
+                    db.cursor.execute(self.get_search_query(), (f'%{search_text}%', warehouse_id))
+                    products = db.cursor.fetchall()
+
+                self.warehouse_table.setRowCount(len(products))
+                self.order_table.setRowCount(len(products))
+
+                for i, product in enumerate(products):
+                    for j, value in enumerate(product):
+                        self.warehouse_table.setItem(i, j, QTableWidgetItem(str(value)))
+                    self.order_table.setItem(i, 0, QTableWidgetItem('0'))
+                self.make_table_read_only()
+            except Exception as e:
+                print(f"Error searching products: {e}")
+                QMessageBox.critical(self, "Ошибка", f"Ошибка поиска продуктов: {e}")
+
     def make_table_read_only(self):
         for row in range(self.warehouse_table.rowCount()):
             for col in range(self.warehouse_table.columnCount()):
@@ -101,3 +126,7 @@ class BaseProductWindow(QMainWindow):
                 item = self.order_table.item(row, col)
                 if item:
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
+
+    def get_search_query(self):
+        # Абстрактный метод для поиска продуктов
+        raise NotImplementedError

@@ -24,10 +24,23 @@ class ProductWindow(BaseWindow):
                 super().__init__('Товары', column_names, self.user, self.password, 'products')
                 self.changes = []  # Для отслеживания изменений
 
-                self.combo_box.currentIndexChanged.connect(self.update_table)
+                # Добавляем элементы поиска
+                self.search_label = QLabel("Поиск товара:")
+                self.search_box = QLineEdit()
+                self.search_button = QPushButton("Поиск")
+                self.search_button.clicked.connect(self.search_products)
 
-                # Добавляем combo_table_layout в основной layout
+                # Добавляем элементы поиска в основной layout
+                search_layout = QHBoxLayout()
+                search_layout.addWidget(self.search_label)
+                search_layout.addWidget(self.search_box)
+                search_layout.addWidget(self.search_button)
+
                 main_layout = self.centralWidget().layout()
+                main_layout.addLayout(search_layout)
+                main_layout.addWidget(self.table_widget)
+
+                self.combo_box.currentIndexChanged.connect(self.update_table)
 
                 self.update_table()
         except Exception as e:
@@ -47,6 +60,31 @@ class ProductWindow(BaseWindow):
                 self.make_table_read_only()
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Ошибка при обновлении таблицы: {e}")
+
+    def search_products(self):
+        search_text = self.search_box.text().lower()
+        if not search_text:
+            self.update_table()
+            return
+
+        try:
+            with Database(self.user, self.password) as db:
+                db.cursor.execute("""
+                    SELECT *
+                    FROM Products
+                    WHERE LOWER(name) LIKE %s
+                """, ('%' + search_text + '%',))
+                products = db.cursor.fetchall()
+
+                self.table_widget.setRowCount(len(products))
+                self.table_widget.setColumnCount(len(self.table_headers))
+                self.table_widget.setHorizontalHeaderLabels(self.table_headers)
+                for i, product in enumerate(products):
+                    for j, value in enumerate(product):
+                        self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
+                self.make_table_read_only()
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при поиске: {e}")
 
     def add_item(self):
         dialog = ProductEditDialog(self.table_widget)
@@ -90,7 +128,7 @@ class ProductWindow(BaseWindow):
                     elif change_type == 'update':
                         logging.debug(f"Updating row with ID {row_id} and data: {row_data}")
                         db.cursor.execute(self.get_update_query(), row_data + [row_id])
-                
+
                 db.conn.commit()
                 self.changes.clear()
                 QMessageBox.information(self, 'Успех', 'Изменения успешно сохранены!')

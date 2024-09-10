@@ -4,7 +4,7 @@ import psycopg2
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QHBoxLayout, QWidget,
     QPushButton, QMessageBox, QTableWidget, QComboBox, QTableWidgetItem,
-    QLabel, QSpinBox
+    QLabel, QSpinBox, QLineEdit
 )
 from psycopg2 import OperationalError, sql
 from Database import Database
@@ -22,6 +22,17 @@ class ReceivingWindow(QMainWindow):
         self.changes = []  # For tracking changes
 
         layout = QVBoxLayout()
+
+        # Search section
+        search_layout = QHBoxLayout()
+        self.search_label = QLabel("Поиск товара:")
+        search_layout.addWidget(self.search_label)
+        self.search_box = QLineEdit()
+        search_layout.addWidget(self.search_box)
+        self.search_button = QPushButton("Поиск")
+        self.search_button.clicked.connect(self.search_products)
+        search_layout.addWidget(self.search_button)
+        layout.addLayout(search_layout)
 
         # Layout for tables
         main_layout = QHBoxLayout()
@@ -93,6 +104,35 @@ class ReceivingWindow(QMainWindow):
                     to_warehouse_combo.addItem(name, id)
                 self.move_table.setCellWidget(i, 1, to_warehouse_combo)
 
+    def search_products(self):
+        search_text = self.search_box.text().lower()
+        if not search_text:
+            self.update_table()
+            return
+
+        with Database(self.user, self.password) as db:
+            db.cursor.execute("""
+                SELECT *
+                FROM Products
+                WHERE LOWER(name) LIKE %s
+            """, ('%' + search_text + '%',))
+            products = db.cursor.fetchall()
+
+            self.warehouse_table.setRowCount(len(products))
+            self.move_table.setRowCount(len(products))
+            self.warehouse_table.setColumnCount(len(products[0]) if products else 0)
+            for i, product in enumerate(products):
+                for j in range(len(product)):
+                    self.warehouse_table.setItem(i, j, QTableWidgetItem(str(product[j])))
+                quantity_spinbox = QSpinBox()
+                quantity_spinbox.setMaximum(999999999)
+                self.move_table.setCellWidget(i, 0, quantity_spinbox)
+                to_warehouse_combo = QComboBox()
+                to_warehouse_combo.addItem("Выберите склад", None)
+                for name, id in self.load_warehouses():
+                    to_warehouse_combo.addItem(name, id)
+                self.move_table.setCellWidget(i, 1, to_warehouse_combo)
+
     def move_products(self):
         for i in range(self.move_table.rowCount()):
             quantity_spinbox = self.move_table.cellWidget(i, 0)
@@ -146,7 +186,6 @@ class ReceivingWindow(QMainWindow):
                                     '{amount}': str(quantity)}
                             doc = DocumentCreator('receivingpreset.docx', data)
                             doc.exec_()
-
 
                 db.conn.commit()
                 self.changes.clear()

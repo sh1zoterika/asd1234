@@ -149,3 +149,8 @@ class AddProductWindow(BaseProductWindow):
             # Roll back in case of error
             db.conn.rollback()
             QMessageBox.critical(self, 'Ошибка', f'Произошла ошибка: {e}')
+
+    def get_search_query(self):
+        return """SELECT products.name, products.id, amount, products.price FROM ProductInWarehouse
+            JOIN Products ON Products.id = ProductInWarehouse.product_id
+            WHERE LOWER(products.name) LIKE %s AND warehouse_id = %s"""

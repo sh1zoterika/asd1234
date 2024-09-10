@@ -139,3 +139,9 @@ class WriteOffProductWindow(BaseProductWindow):
             data = dialog.get_data()
             logging.debug(f"Collected data for update: {data}")
             self.order_table.setItem(row, 0, QTableWidgetItem(data[0]))  # Обновляем данные в таблице
+
+    def get_search_query(self):
+        return """SELECT Products.name, ProductInWarehouse.product_id, ProductInWarehouse.amount
+                FROM ProductInWarehouse
+                JOIN Products ON Products.id = ProductInWarehouse.product_id
+                WHERE LOWER(Products.name) LIKE %s AND ProductInWarehouse.warehouse_id = %s;"""

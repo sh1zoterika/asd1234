@@ -13,6 +13,7 @@ from EditDialog import EditDialog  # Импортируем EditDialog
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 class BaseWindow(QMainWindow):
     def __init__(self, title, table_headers, user, password, table_name):
         super().__init__()
@@ -46,7 +47,18 @@ class BaseWindow(QMainWindow):
         self.save_button.clicked.connect(self.save_changes)
         button_layout.addWidget(self.save_button)
 
-        layout.addLayout(button_layout)  # Добавляем button_layout в основной layout
+        # Создание элементов поиска
+        search_layout = QHBoxLayout()
+        self.search_label = QLabel('Поиск:')
+        search_layout.addWidget(self.search_label)
+        self.search_box = QLineEdit()
+        search_layout.addWidget(self.search_box)
+        self.search_button = QPushButton('Поиск')
+        self.search_button.clicked.connect(self.search_items)
+        search_layout.addWidget(self.search_button)
+
+        layout.addLayout(button_layout)
+        layout.addLayout(search_layout)  # Добавление layout поиска в основной layout
 
         container = QWidget()
         container.setLayout(layout)
@@ -88,6 +100,25 @@ class BaseWindow(QMainWindow):
         except Exception as e:
             logging.error(f"Error loading data: {e}")
             QMessageBox.critical(self, 'Ошибка', f'Ошибка при загрузке данных: {e}')
+
+    def search_items(self):
+        search_text = self.search_box.text().lower()  # Получаем текст из поля поиска
+        try:
+            with Database(self.user, self.password) as db:
+                db.update_id(self.table_name)
+                query = self.get_search_query()
+                db.cursor.execute(query, (f'%{search_text}%',))
+                items = db.cursor.fetchall()
+                self.table_widget.setRowCount(len(items))
+                self.table_widget.setColumnCount(len(self.table_headers))
+                self.table_widget.setHorizontalHeaderLabels(self.table_headers)
+                for i, item in enumerate(items):
+                    for j, value in enumerate(item):
+                        self.table_widget.setItem(i, j, QTableWidgetItem(str(value)))
+                self.make_table_read_only()
+        except Exception as e:
+            logging.error(f"Error searching items: {e}")
+            QMessageBox.critical(self, 'Ошибка', f'Ошибка поиска: {e}')
 
     def add_item(self):
         dialog = EditDialog(self.table_widget)
@@ -147,7 +178,7 @@ class BaseWindow(QMainWindow):
                 item = self.table_widget.item(row, col)
                 if item:
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
-                    
+
     def valid(self, new_text, column):
         return True
 
@@ -161,4 +192,7 @@ class BaseWindow(QMainWindow):
         raise NotImplementedError
 
     def get_update_query(self):
+        raise NotImplementedError
+
+    def get_search_query(self):
         raise NotImplementedError

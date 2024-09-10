@@ -64,6 +64,13 @@ class WarehouseWindow(BaseWindow):
             WHERE id = %s
         """
 
+    def get_search_query(self):
+        return """
+        SELECT id, name, address, geo_text, geo_coordinates
+        FROM Warehouses
+        WHERE LOWER(name) LIKE %s
+        """
+
     def add_item(self):
         dialog = EditDialog(self.table_widget)
         if dialog.exec_() == QDialog.Accepted:

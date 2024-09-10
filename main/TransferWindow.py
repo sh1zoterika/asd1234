@@ -35,11 +35,11 @@ class TransferWindow(QMainWindow):
         self.setWindowTitle('Перемещение товаров')
         self.setGeometry(600, 200, 800, 600)
 
-        self.changes = []  # For tracking changes
+        self.changes = []  # Для отслеживания изменений
 
         layout = QVBoxLayout()
 
-        # Layout for combo boxes
+        # Layout для комбо боксов
         combo_layout = QHBoxLayout()
 
         self.from_warehouse_combo_box = QComboBox()
@@ -48,23 +48,21 @@ class TransferWindow(QMainWindow):
         self.from_warehouse_combo_box.currentIndexChanged.connect(self.update_table)
         combo_layout.addWidget(self.from_warehouse_combo_box)
 
-        # No combo box for right table, only columns
-        # Adding a placeholder for consistency
         self.to_warehouse_label = QLabel('Склад назначения:')
         combo_layout.addWidget(self.to_warehouse_label)
 
         layout.addLayout(combo_layout)
 
-        # Layout for tables
+        # Layout для таблиц
         main_layout = QHBoxLayout()
 
-        # Table for products in the selected warehouse
+        # Таблица для товаров на выбранном складе
         self.warehouse_table = QTableWidget()
         self.warehouse_table.setColumnCount(3)
         self.warehouse_table.setHorizontalHeaderLabels(['ID товара', 'Название товара', 'Количество'])
         main_layout.addWidget(self.warehouse_table)
 
-        # Table for moving products
+        # Таблица для перемещения товаров
         self.move_table = QTableWidget()
         self.move_table.setColumnCount(2)
         self.move_table.setHorizontalHeaderLabels(['Количество', 'Склад назначения'])
@@ -73,7 +71,7 @@ class TransferWindow(QMainWindow):
 
         layout.addLayout(main_layout)
 
-        # Buttons for operations
+        # Layout для кнопок операций
         button_layout = QHBoxLayout()
 
         self.move_button = QPushButton('Переместить')
@@ -90,11 +88,22 @@ class TransferWindow(QMainWindow):
 
         layout.addLayout(button_layout)
 
+        # Layout для поиска
+        search_layout = QHBoxLayout()
+        self.search_label = QLabel('Поиск товара:')
+        search_layout.addWidget(self.search_label)
+        self.search_box = QLineEdit()
+        search_layout.addWidget(self.search_box)
+        self.search_button = QPushButton('Поиск')
+        self.search_button.clicked.connect(self.search_items)
+        search_layout.addWidget(self.search_button)
+        layout.addLayout(search_layout)
+
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
 
-        # Initial load
+        # Изначальная загрузка
         self.update_table()
 
     def load_warehouses(self, combo_box):
@@ -104,9 +113,9 @@ class TransferWindow(QMainWindow):
                 combo_box.addItem(warehouse[1], warehouse[0])
 
     def update_table(self):
-        with Database(self.user, self.password) as db:
-            from_warehouse_id = self.from_warehouse_combo_box.currentData()
-            if from_warehouse_id is not None:
+        from_warehouse_id = self.from_warehouse_combo_box.currentData()
+        if from_warehouse_id is not None:
+            with Database(self.user, self.password) as db:
                 db.cursor.execute("""
                     SELECT Products.id, Products.name, ProductInWarehouse.amount
                     FROM ProductInWarehouse
@@ -121,7 +130,7 @@ class TransferWindow(QMainWindow):
                     self.warehouse_table.setItem(i, 1, QTableWidgetItem(product[1]))
                     self.warehouse_table.setItem(i, 2, QTableWidgetItem(str(product[2])))
 
-                    # Initialize move_table
+                    # Инициализация move_table
                     quantity_spinbox = QSpinBox()
                     quantity_spinbox.setMaximum(999999999)
                     self.move_table.setCellWidget(i, 0, quantity_spinbox)
@@ -159,7 +168,7 @@ class TransferWindow(QMainWindow):
                 for change in self.changes:
                     change_type, from_warehouse, to_warehouse, product_id, quantity = change
                     if change_type == 'move':
-                        # Move product from one warehouse to another
+                        # Перемещение товара с одного склада на другой
                         db.cursor.execute("""
                             UPDATE ProductInWarehouse
                             SET amount = amount - %s
@@ -185,10 +194,10 @@ class TransferWindow(QMainWindow):
                         db.cursor.execute('SELECT name FROM PRODUCTS WHERE id = %s', (product_id,))
                         product_name = db.cursor.fetchone()
                         data = {'{from_warehouse}': str(from_warehouse),
-                        '{to_warehouse}': str(to_warehouse),
-                        '{product_name}': str(product_name[0]),
-                        '{product_id}': str(product_id),
-                        '{amount}': str(quantity)}
+                                '{to_warehouse}': str(to_warehouse),
+                                '{product_name}': str(product_name[0]),
+                                '{product_id}': str(product_id),
+                                '{amount}': str(quantity)}
                         doc = DocumentCreator('transferpreset.docx', data)
                         doc.exec_()
 
@@ -198,7 +207,7 @@ class TransferWindow(QMainWindow):
         except Exception as e:
             if db.conn:
                 db.conn.rollback()
-            logging.error(f"Error saving changes: {e}")
+            logging.error(f"Ошибка при сохранении изменений: {e}")
             QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
 
     def make_table_read_only(self):
@@ -214,7 +223,7 @@ class TransferWindow(QMainWindow):
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
 
     def edit_item(self, row, column):
-        logging.debug(f"Opening EditDialog for row {row}, column {column}")
+        logging.debug(f"Открытие EditDialog для строки {row}, столбца {column}")
         dialog = EditDialog(self.move_table, row, column)
         if dialog.exec_() == QDialog.Accepted:
             data = dialog.get_data()
@@ -223,3 +232,34 @@ class TransferWindow(QMainWindow):
                 item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
                 self.move_table.setItem(row, 0, item)  # Обновляем данные в таблице
             QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
+
+    def search_items(self):
+        search_text = self.search_box.text().lower()  # Получаем текст из поля поиска
+        from_warehouse_id = self.from_warehouse_combo_box.currentData()
+
+        if from_warehouse_id:
+            with Database(self.user, self.password) as db:
+                db.cursor.execute("""
+                    SELECT Products.id, Products.name, ProductInWarehouse.amount
+                    FROM ProductInWarehouse
+                    JOIN Products ON Products.id = ProductInWarehouse.product_id
+                    WHERE ProductInWarehouse.warehouse_id = %s
+                    AND LOWER(Products.name) LIKE %s
+                """, (from_warehouse_id, f'%{search_text}%'))
+                products = db.cursor.fetchall()
+                self.warehouse_table.setRowCount(len(products))
+                self.move_table.setRowCount(len(products))
+                for i, product in enumerate(products):
+                    self.warehouse_table.setItem(i, 0, QTableWidgetItem(str(product[0])))
+                    self.warehouse_table.setItem(i, 1, QTableWidgetItem(product[1]))
+                    self.warehouse_table.setItem(i, 2, QTableWidgetItem(str(product[2])))
+
+                    # Инициализация move_table
+                    quantity_spinbox = QSpinBox()
+                    quantity_spinbox.setMaximum(999999999)
+                    self.move_table.setCellWidget(i, 0, quantity_spinbox)
+                    to_warehouse_combo = QComboBox()
+                    to_warehouse_combo.addItem("Выберите склад", None)
+                    self.load_warehouses(to_warehouse_combo)
+                    self.move_table.setCellWidget(i, 1, to_warehouse_combo)
+                self.make_table_read_only()

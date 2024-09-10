@@ -106,7 +106,8 @@ class Database():
 
     def get_product_in_warehouse(self, warehouseid):
         try:
-            self.cursor.execute(f"""SELECT * FROM productinwarehouse
+            self.cursor.execute(f"""SELECT warehouse_id, product_id, amount, Products.name FROM ProductInWarehouse
+            JOIN Products ON Products.id = ProductInWarehouse.product_id
             WHERE warehouse_id = {warehouseid}
             """)
             result = self.cursor.fetchall()
