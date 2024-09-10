@@ -14,6 +14,8 @@ from WriteOffProductWindow import WriteOffProductWindow
 from ClientWindow import ClientWindow
 from WarehouseWindow import WarehouseWindow
 from ReceivingWindow import ReceivingWindow
+import os
+import subprocess
 
 
 class MainWindow(QMainWindow):
@@ -83,7 +85,27 @@ class MainWindow(QMainWindow):
             #QMessageBox.critical(self, 'Ошибка', f'Ошибка открытия окна со складами: {e}')
 
     def open_documents_window(self):
-        pass
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        folder_name = "docs"
+        folder_path = os.path.join(project_root, folder_name)
+
+        # Проверяем, существует ли папка
+        if not os.path.isdir(folder_path):
+            print(f"Папка '{folder_name}' не найдена в проекте.")
+            return
+
+        # Открываем папку с помощью проводника Windows
+        subprocess.run(["explorer", folder_path])
 
     def open_templates_window(self):
-        pass
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        folder_name = "presets"
+        folder_path = os.path.join(project_root, folder_name)
+
+        # Проверяем, существует ли папка
+        if not os.path.isdir(folder_path):
+            print(f"Папка '{folder_name}' не найдена в проекте.")
+            return
+
+        # Открываем папку с помощью проводника Windows
+        subprocess.run(["explorer", folder_path])
