@@ -26,17 +26,6 @@ class ClientWindow(BaseWindow):
         layout = self.centralWidget().layout()
         layout.addWidget(self.view_orders_button)
 
-        # Поле для поиска клиентов
-        self.search_label = QLabel("Поиск клиента:")
-        layout.addWidget(self.search_label)
-        self.search_box = QLineEdit()
-        layout.addWidget(self.search_box)
-
-        # Кнопка для поиска клиентов
-        self.search_button = QPushButton("Поиск")
-        self.search_button.clicked.connect(self.search_items)
-        layout.addWidget(self.search_button)
-
     def view_orders(self):
         selected_items = self.table_widget.selectedItems()
         if selected_items:
@@ -50,13 +39,13 @@ class ClientWindow(BaseWindow):
 
     def get_select_query(self):
         return """
-            SELECT id, name, orders, info, phonenumber, address
+            SELECT id, name, info, phonenumber, address
             FROM Clients
         """
 
     def get_insert_query(self):
         return """
-            INSERT INTO Clients (id, name, orders, info, phonenumber, address)
+            INSERT INTO Clients (id, name, info, phonenumber, address)
             VALUES (%s, %s, %s, %s, %s, %s)
         """
 
@@ -65,9 +54,14 @@ class ClientWindow(BaseWindow):
 
     def get_update_query(self):
         return """
-            UPDATE Clients SET name = %s, orders = %s, info = %s, phonenumber = %s, address = %s
+            UPDATE Clients SET name = %s, info = %s, phonenumber = %s, address = %s
             WHERE id = %s
         """
+
+    def get_search_query(self):
+        return """SELECT id, name, orders, info, phonenumber, address
+            FROM Clients
+            WHERE LOWER(name) LIKE %s"""
 
     def add_item(self):
         dialog = EditDialog(self.table_widget)
@@ -142,20 +136,3 @@ class ClientWindow(BaseWindow):
             QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
         elif result == QDialog.Rejected:
             logging.debug("EditDialog was cancelled.")
-
-    def search_items(self):
-        search_text = self.search_box.text().lower()
-        if not search_text:
-            # Если поле поиска пустое таблица просто обновится
-            self.update_table()
-            return
-
-        for row in range(self.table_widget.rowCount()):
-            item = self.table_widget.item(row, 1)  # Поиск по имени клиента (второй столбец)
-            if item and search_text in item.text().lower():
-                self.table_widget.setRowHidden(row, False)
-            else:
-                self.table_widget.setRowHidden(row, True)
-
-        if all(self.table_widget.isRowHidden(row) for row in range(self.table_widget.rowCount())):
-            QMessageBox.information(self, 'Поиск', 'Клиенты не найдены.')
