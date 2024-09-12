@@ -150,10 +150,23 @@ class EditDialog(QDialog):
             QMessageBox.critical(self, "Ошибка", "Некорректные данные! Попробуйте еще раз.")
 
     def validate_data(self, data):
-        for item in data:
+        for i, item in enumerate(data):
             if item is None or item.strip() == "":
                 return False
             if self.max_value is not None and int(item) > self.max_value:
                 QMessageBox.warning(self, "Ошибка", f"Введенное количество превышает доступное на складе ({self.max_value}). Попробуйте еще раз.")
                 return False
+            
+            # Проверка поля full_name
+            if self.table_widget.horizontalHeaderItem(i).text() == 'full_name':
+                if not re.match(r'^[А-Яа-яЁё\-]+(?:\s+[А-Яа-яЁё\-]+){1,2}$', item):
+                    QMessageBox.warning(self, "Ошибка", "Некорректный формат ФИО. Ожидается: Фамилия Имя Отчество.")
+                    return False
+            
+            # Проверка поля address
+            if self.table_widget.horizontalHeaderItem(i).text() == 'address':
+                if not re.match(r'^[А-Яа-яЁё\w\s]+,\s*[А-Яа-яЁё\w\s]+,\s*[А-Яа-яЁё\w\s]+,\s*[А-Яа-яЁё\w\s\d]+$', item):
+                    QMessageBox.warning(self, "Ошибка", "Некорректный формат адреса. Ожидается: г.Город, ул.Улица, дом номер, квартира номер.")
+                    return False
+
         return True

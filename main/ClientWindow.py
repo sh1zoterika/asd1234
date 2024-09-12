@@ -46,7 +46,7 @@ class ClientWindow(BaseWindow):
     def get_insert_query(self):
         return """
             INSERT INTO Clients (id, full_name, info, phonenumber, address)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s)
         """
 
     def get_delete_query(self):
