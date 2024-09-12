@@ -2,10 +2,12 @@ import sys
 import logging
 import psycopg2
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QMessageBox, QWidget
+    QDialog, QVBoxLayout, QTableWidget, QTableWidgetItem, QMessageBox, QWidget, QPushButton, QApplication
 )
 from PyQt5 import QtCore
 from Database import Database
+from SalesWindow import SalesWindow
+
 
 class ViewOrdersWindow(QDialog):
     def __init__(self, user, password, client_id):
@@ -20,6 +22,9 @@ class ViewOrdersWindow(QDialog):
         layout = QVBoxLayout()
         self.table_widget = QTableWidget()
         layout.addWidget(self.table_widget)
+        self.sales_button = QPushButton('Перейти в продажи')
+        self.sales_button.clicked.connect(self.gotosales)
+        layout.addWidget(self.sales_button)
         self.setLayout(layout)
 
         self.load_orders()
@@ -35,7 +40,7 @@ class ViewOrdersWindow(QDialog):
                 orders = db.cursor.fetchall()
                 self.table_widget.setRowCount(len(orders))
                 self.table_widget.setColumnCount(4)
-                self.table_widget.setHorizontalHeaderLabels(["ID", "Цена", "Дата", "Статус"])
+                self.table_widget.setHorizontalHeaderLabels(["ID", "price", "date", "status"])
                 for i, order in enumerate(orders):
                     for j, value in enumerate(order):
                         item = QTableWidgetItem(str(value))
@@ -44,3 +49,11 @@ class ViewOrdersWindow(QDialog):
         except Exception as e:
             logging.error(f"Error loading orders: {e}")
             QMessageBox.critical(self, "Ошибка", f"Ошибка при загрузке заказов: {e}")
+
+    def gotosales(self):
+        try:
+            saleswindow = SalesWindow(self.user, self.password)
+            saleswindow.show()
+        except Exception as e:
+            logging.error(f"Error opening SalesWindow: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при открытии окна продаж: {e}")

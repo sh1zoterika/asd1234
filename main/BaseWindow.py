@@ -179,9 +179,6 @@ class BaseWindow(QMainWindow):
                 if item:
                     item.setFlags(item.flags() & ~QtCore.Qt.ItemIsEditable)
 
-    def valid(self, new_text, column):
-        return True
-
     def get_select_query(self):
         raise NotImplementedError
 

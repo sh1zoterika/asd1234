@@ -71,7 +71,7 @@ class EditDialog(QDialog):
             'description': 'TEXT',
             'category': 'VARCHAR',
             'png_url': 'BYTEA',
-            'address': 'VARCHAR',
+            'address': 'ADDRESS',
             'geo_text': 'TEXT',
             'geo_coordinates': 'GEO_COORDINATES',
             'warehouse_id': 'INT',
@@ -84,7 +84,8 @@ class EditDialog(QDialog):
             'price': 'INT',
             'date': 'TIMESTAMP',
             'status': 'VARCHAR',
-            'order_id': 'INT'
+            'order_id': 'INT',
+            'full_name': 'FULL_NAME'
         }
         return data_types.get(column_name, 'VARCHAR')
 
@@ -110,6 +111,17 @@ class EditDialog(QDialog):
         elif data_type == 'GEO_COORDINATES':
             widget = QLineEdit()
             reg_exp = QRegExp(r'^-?\d{1,3}\.\d{1,6},\s*-?\d{1,3}\.\d{1,6}$')  # Регулярное выражение для проверки координат
+            validator = QRegExpValidator(reg_exp)
+            widget.setValidator(validator)
+        elif data_type == 'ADDRESS':
+            widget = QLineEdit()
+            reg_exp = QRegExp(
+                r'^[А-Яа-яЁё\w\s]+,\s*[А-Яа-яЁё\w\s]+,\s*[А-Яа-яЁё\w\s]+,\s*[А-Яа-яЁё\w\s\d]+$')  # Регулярное выражение для проверки адреса
+            validator = QRegExpValidator(reg_exp)
+            widget.setValidator(validator)
+        elif data_type == 'FULL_NAME':
+            widget = QLineEdit()
+            reg_exp = QRegExp(r'^[А-Яа-яЁё\-]+(?:\s+[А-Яа-яЁё\-]+){1,2}$')  # Регулярное выражение для проверки ФИО
             validator = QRegExpValidator(reg_exp)
             widget.setValidator(validator)
         else:

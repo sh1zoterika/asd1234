@@ -50,7 +50,7 @@ class Database():
     def get_orders(self):
         try:
             query = """
-            SELECT o.id, c.name 
+            SELECT o.id, c.full_name 
             FROM Orders o 
             JOIN Clients c ON o.client_id = c.id
             """

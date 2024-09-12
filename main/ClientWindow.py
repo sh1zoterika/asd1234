@@ -39,13 +39,13 @@ class ClientWindow(BaseWindow):
 
     def get_select_query(self):
         return """
-            SELECT id, name, info, phonenumber, address
+            SELECT id, full_name, info, phonenumber, address
             FROM Clients
         """
 
     def get_insert_query(self):
         return """
-            INSERT INTO Clients (id, name, info, phonenumber, address)
+            INSERT INTO Clients (id, full_name, info, phonenumber, address)
             VALUES (%s, %s, %s, %s, %s, %s)
         """
 
@@ -54,12 +54,12 @@ class ClientWindow(BaseWindow):
 
     def get_update_query(self):
         return """
-            UPDATE Clients SET name = %s, info = %s, phonenumber = %s, address = %s
+            UPDATE Clients SET full_name = %s, info = %s, phonenumber = %s, address = %s
             WHERE id = %s
         """
 
     def get_search_query(self):
-        return """SELECT id, name, orders, info, phonenumber, address
+        return """SELECT id, full_name, orders, info, phonenumber, address
             FROM Clients
             WHERE LOWER(name) LIKE %s"""
 
@@ -72,6 +72,7 @@ class ClientWindow(BaseWindow):
             for col, value in enumerate(data):
                 self.table_widget.setItem(row_position, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
             self.update_ids()
+            self.make_table_read_only()
             self.changes.append(('insert', None, data))
             QMessageBox.information(self, 'Успех', 'Элемент успешно добавлен!')
 
@@ -133,6 +134,7 @@ class ClientWindow(BaseWindow):
             for col, value in enumerate(data):
                 self.table_widget.setItem(row, col + 1, QTableWidgetItem(value))  # Обновляем данные в таблице
             self.changes.append(('update', self.table_widget.item(row, 0).text(), data))
+            self.make_table_read_only()
             QMessageBox.information(self, 'Успех', 'Данные успешно обновлены!')
         elif result == QDialog.Rejected:
             logging.debug("EditDialog was cancelled.")

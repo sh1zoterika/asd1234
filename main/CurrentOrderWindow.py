@@ -62,7 +62,7 @@ class CurrentOrderWindow(QMainWindow):
     def update_clients(self):
         try:
             with Database(self.user, self.password) as db:
-                db.cursor.execute("SELECT id, name FROM Clients")
+                db.cursor.execute("SELECT id, full_name FROM Clients")
                 clients = db.cursor.fetchall()
                 self.client_combo.clear()
                 for client in clients:
@@ -76,7 +76,7 @@ class CurrentOrderWindow(QMainWindow):
             if client_id is not None:
                 with Database(self.user, self.password) as db:
                     db.cursor.execute("""
-                        SELECT Orders.id, Clients.name, Orders.price, Orders.date, Orders.status
+                        SELECT Orders.id, Clients.full_name, Orders.price, Orders.date, Orders.status
                         FROM Orders
                         JOIN Clients ON Orders.client_id = Clients.id
                         WHERE Orders.client_id = %s AND Orders.status = 'В процессе'
@@ -85,7 +85,7 @@ class CurrentOrderWindow(QMainWindow):
 
                 self.table_widget.setRowCount(len(orders))
                 self.table_widget.setColumnCount(5)
-                self.table_widget.setHorizontalHeaderLabels(["ID", "Клиент", "Цена", "Дата", "Статус"])
+                self.table_widget.setHorizontalHeaderLabels(["ID", "full_name", "price", "date", "status"])
                 for i, order in enumerate(orders):
                     self.table_widget.setItem(i, 0, QTableWidgetItem(str(order[0])))
                     self.table_widget.setItem(i, 1, QTableWidgetItem(order[1]))

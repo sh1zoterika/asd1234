@@ -27,7 +27,7 @@ class WriteOffProductWindow(BaseProductWindow):
             'insert': """UPDATE ProductInWarehouse SET amount = amount - %s 
             WHERE warehouse_id = %s AND product_id = %s AND amount >= %s"""
         }
-        headers = ['Имя товара', 'ID товара', 'Количество в наличии', 'Количество списания']
+        headers = ['name', 'product_id', 'amount', 'Количество списания']
         super().__init__('Списание товаров', (600, 200, 1000, 600), headers, self.query, user, password)
 
         self.order_table.cellDoubleClicked.connect(self.edit_item)
