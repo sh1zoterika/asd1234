@@ -59,9 +59,9 @@ class ClientWindow(BaseWindow):
         """
 
     def get_search_query(self):
-        return """SELECT id, full_name, orders, info, phonenumber, address
+        return """SELECT id, full_name, info, phonenumber, address
             FROM Clients
-            WHERE LOWER(name) LIKE %s"""
+            WHERE LOWER(full_name) LIKE %s"""
 
     def add_item(self):
         dialog = EditDialog(self.table_widget)
