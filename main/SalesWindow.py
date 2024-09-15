@@ -19,7 +19,7 @@ class SalesWindow(QMainWindow):
     def __init__(self, user=None, password=None, parent=None):
         self.user = user
         self.password = password
-        super().__init__(parent)
+        super().__init__()
         self.setWindowTitle("Продажа товаров")
         self.setGeometry(600, 200, 800, 600)
 

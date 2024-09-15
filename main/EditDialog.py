@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import QDialog, QFormLayout, QDateEdit, QSpinBox, QLineEdit
 from PyQt5.QtCore import QDate, QRegExp
 from PyQt5.QtGui import QRegExpValidator
 import logging
+import re
 
 class EditDialog(QDialog):
     def __init__(self, table_widget, row=None, column=None, max_value=None):

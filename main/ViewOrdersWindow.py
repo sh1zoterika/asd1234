@@ -6,9 +6,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5 import QtCore
 from Database import Database
-from SalesWindow import SalesWindow
-
-
+from EditOrderWindow import EditOrderDialog
 class ViewOrdersWindow(QDialog):
     def __init__(self, user, password, client_id):
         super().__init__()
@@ -52,8 +50,13 @@ class ViewOrdersWindow(QDialog):
 
     def gotosales(self):
         try:
-            saleswindow = SalesWindow(self.user, self.password)
-            saleswindow.show()
+            selected_row = self.table_widget.currentRow()
+            if selected_row != -1:  # Проверяем, что строка выбрана
+                order_id = self.table_widget.item(selected_row, 0).text()
+                editorder = EditOrderDialog(self.user, self.password, order_id)
+                editorder.exec_()
+            else:
+                QMessageBox.warning(self, 'Ошибка', 'Пожалуйста, выберите заказ.')
         except Exception as e:
-            logging.error(f"Error opening SalesWindow: {e}")
+            logging.error(f"Error opening EditOrderDialog: {e}")
             QMessageBox.critical(self, "Ошибка", f"Ошибка при открытии окна продаж: {e}")
